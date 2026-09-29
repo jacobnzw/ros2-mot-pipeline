@@ -2,4 +2,9 @@
 name = "ros2-mot-pipeline"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "ipython>=9.17.1",
+    "marimo>=0.25.0",
+    "matplotlib>=3.11.2",
+    "pandas>=3.0.6",
+]

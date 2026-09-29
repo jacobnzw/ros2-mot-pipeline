@@ -39,3 +39,57 @@ Phase 1 is successful if and only if:
 - [ ] CPU/GPU utilisation and peak memory are documented.
 - [ ] A written decision is made: proceed to Jetson, extend ROS2 work, or stop.
 - [ ] Results are reported honestly, including negative or partial findings.
+
+
+### Week 0: Setup, dataset lock, architecture (5–7 h)
+🏆 Goal: Freeze scope before coding.
+
+Results
+
+- [x] Repository created with basic structure.
+- [x] One-sentence hypothesis written.
+- [ ] Detector and tracker chosen.
+- [ ] Datasets selected and partially downloaded.
+- [x] Architecture diagram drafted.
+- [ ] Experiment table created.
+- [ ] Hardware baseline: run the chosen YOLO model on 200 frames and record median/p95 latency + peak memory on this machine.
+
+Dataset rule
+
+- One annotated sequence for metrics (MOT17 or KITTI Tracking).
+- One ROS-compatible source (public bag or short self-recorded sequence). Plan the recording in Week 0 if needed.
+
+Checkpoint
+
+- Environment reproducible and hardware baseline numbers written down. If not, stop and fix reproducibility first.
+
+
+### Weeks 1–2: Offline baseline + ONNX (20–25 h)
+
+🏆 Goal: Produce a correct, measured detector → tracker pipeline and a validated ONNX path.
+
+#### Results to achieve
+
+- [ ] YOLOv8-N/YOLO11-N running on the chosen sequences.
+- [ ] ByteTrack integrated (switch to OC-SORT after 4 h max if integration fails).
+- [ ] Annotated output video with track IDs.
+- [ ] Basic detection and tracking metrics recorded.
+- [ ] Model exported to ONNX and numerically + visually validated against PyTorch.
+- [ ] Inference latency comparison: PyTorch vs ONNX Runtime (CPU + CUDA if available).
+- [ ] Optional stretch: TensorRT engine on PC (document any failure; engine is not expected to be portable to Jetson).
+
+#### Measurements
+
+- [ ] Detection latency (median, p95, p99) and throughput.
+- [ ] Tracking metrics (MOTA/IDF1/HOTA or ID switches + fragmentation).
+- [ ] Peak CPU/GPU memory and utilisation.
+- [ ] ONNX file size and numerical difference vs PyTorch.
+
+#### Timeboxing
+
+- Tracker debugging ≤ 4 h → switch.
+- TensorRT debugging ≤ 6 h → fall back to ONNX Runtime and document.
+
+#### Exit / pivot
+
+A valid result is a clean offline Python pipeline + ONNX path even if TensorRT fails.
