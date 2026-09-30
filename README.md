@@ -24,19 +24,11 @@ flowchart LR
 ## TODO
 
 - [x] Select and partially download the datasets
-    - One annotated sequence for metrics: MOT17 or KITTI Tracking.
-    - One ROS-compatible source: a public ROS bag or a short self-recorded sequence (plan the recording this week if none exists).
-
-    👉 Download only what is needed for the first baseline eval runs. Note the exact sequences and any preprocessing steps in `docs/reproducibility.md`.
+    - [ ] KITTI Tracking to MCAP
 - [x] Lock the detector and tracker (YOLOv8-N / YOLO11-N + ByteTrack)
-    - [ ] Record the exact model weights and library versions you will use.
-- [ ] Create the experiment table
-    - Detection latency (median / p95 / p99)
-    - Throughput (FPS)
-    - Tracking metrics (MOTA / IDF1 / HOTA or ID-switches + fragmentation)
-    - Peak CPU / GPU memory and utilisation
-    - ONNX file size and numerical difference vs PyTorch
-    - End-to-end pipeline latency and queue behaviour (later)
+    - [ ] Download YOLOv11-n
+    - [ ] Download ByteTrack
+    - [x] Record the exact model weights and library versions you will use.
 - [ ] Run the hardware baseline (critical checkpoint)
     - Load the chosen YOLO model.
     - Run inference on ~200 frames from the selected sequence.

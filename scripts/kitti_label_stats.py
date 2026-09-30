@@ -18,9 +18,6 @@ import pandas as pd
 def analyze_label_file(path: Path) -> dict:
     """Parse one KITTI tracking label file and return stats."""
     # Columns we care about (KITTI tracking format)
-    # frame, track_id, type, truncated, occluded, alpha,
-    # bbox_left, bbox_top, bbox_right, bbox_bottom,
-    # height, width, length, x, y, z, rotation_y
     cols = [
         "frame",
         "track_id",
