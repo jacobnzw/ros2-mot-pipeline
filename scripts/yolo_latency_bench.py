@@ -3,14 +3,14 @@ import math
 import time
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 import torch
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 from ultralytics import YOLO
-import seaborn as sns
-import matplotlib.pyplot as plt
 
 YOLOv11n = "models/yolo/yolo11n.pt"
 
@@ -36,15 +36,19 @@ class KittiImages(Dataset):
 def _model_latency(model, input, device) -> float:
     if device.type == "cuda":
         # GPU precise timing using CUDA events
-        start_event = torch.cuda.Event(enable_timing=True)
-        end_event = torch.cuda.Event(enable_timing=True)
+        # start_event = torch.cuda.Event(enable_timing=True)
+        # end_event = torch.cuda.Event(enable_timing=True)
 
-        start_event.record()
-        _ = model(input, verbose=False)
-        end_event.record()
+        # start_event.record()
+        torch.cuda.synchronize()  # Wait for the GPU to finish any current work
+        start_time = time.perf_counter()
 
-        torch.cuda.synchronize()
-        latency_ms = start_event.elapsed_time(end_event)  # Returns milliseconds
+        _ = model(input, verbose=False)  # GPU works ...
+
+        torch.cuda.synchronize()  # Wait for the GPU to finish
+        latency_ms = (time.perf_counter() - start_time) * 1000
+        # end_event.record()
+        # latency_ms = start_event.elapsed_time(end_event)  # Returns milliseconds
     else:
         # CPU timing
         start_time = time.perf_counter()
@@ -54,44 +58,10 @@ def _model_latency(model, input, device) -> float:
     return latency_ms
 
 
-def _synthetic_benchmark_loop(model, dummy_input, num_runs, img_size=640, device="cuda"):
-    """Synthetic bench feeding dummy_input into the model."""
-
-    # Latency benchmarking loop
-    print(f"Benchmarking {num_runs} runs...")
-    latencies = []
-
-    for _ in range(num_runs):
-        latency_ms = _model_latency(model, dummy_input, device)
-        latencies.append(latency_ms)
-
-    return latencies
-
-
-def _kitti_benchmark_loop(model, img_dir, img_scale=1.0, device="cuda"):
-    new_hw = (
-        math.ceil(img_scale * (KittiImages.HEIGHT // 32)) * 32,
-        math.ceil(img_scale * (KittiImages.WIDTH // 32)) * 32,
-    )
-    print(f"{new_hw=}")
-    transform = transforms.Compose(
-        [
-            transforms.Resize(new_hw),
-            transforms.ToTensor(),
-        ]
-    )
-    dataset = KittiImages(img_dir, transform=transform)
-    loader = DataLoader(dataset, batch_size=1, shuffle=False)
-
-    latencies = []
-    for img in loader:
-        latency_ms = _model_latency(model, img, device)
-        latencies.append(latency_ms)
-
-    return latencies
-
-
 def benchmark_yolo(args):
+
+    torch.manual_seed(args.seed)
+
     # 1. Initialize device and model
     device = torch.device(args.device)
     # auto-downloaded to model_path if not already present
@@ -103,7 +73,11 @@ def benchmark_yolo(args):
         torch.cuda.reset_peak_memory_stats(device)
 
     # Warmup runs (ignores initial model loading overhead)
-    dummy_input = torch.randn(1, 3, args.img_size, args.img_size).to(device)
+    new_hw = (
+        math.ceil(args.scale * (KittiImages.HEIGHT // 32)) * 32,
+        math.ceil(args.scale * (KittiImages.WIDTH // 32)) * 32,
+    )
+    dummy_input = torch.randn(1, 3, *new_hw).to(device)
     dummy_input /= dummy_input.max()
     print("Running warmup...")
     for _ in range(args.n_warmup_runs):
@@ -112,10 +86,20 @@ def benchmark_yolo(args):
     if device.type == "cuda":
         torch.cuda.synchronize()
 
-    if args.kitti_seq:
-        latencies = _kitti_benchmark_loop(model, args.kitti_seq, args.kitti_scale, device)
-    else:
-        latencies = _synthetic_benchmark_loop(model, dummy_input, args.n_runs, args.img_size, device)
+    transform = transforms.Compose(
+        [
+            transforms.Resize(new_hw),
+            transforms.ToTensor(),
+        ]
+    )
+    dataset = KittiImages(args.kitti_seq, transform=transform)
+    loader = DataLoader(dataset, batch_size=1, shuffle=False)
+
+    latencies = []
+    for img in loader:
+        # TODO: shouldn't img be transfered to GPU??
+        latency_ms = _model_latency(model, img, device)
+        latencies.append(latency_ms)
 
     # Calculate Latency Percentiles
     median_latency = np.median(latencies)
@@ -127,8 +111,10 @@ def benchmark_yolo(args):
     plt.ylabel("Count")
     plt.title("YOLO Latency Distribution")
     plt.tight_layout()
-    plt.savefig("results/figures/yolo_latency_histogram_baseline.png")
+    histogram_path = "results/figures/yolo_latency_histogram_baseline.png"
+    plt.savefig(histogram_path)
     plt.close()
+    print(f"Latency histogram saved: {histogram_path}")
 
     # Measure Peak Memory
     if device.type == "cuda":
@@ -143,7 +129,7 @@ def benchmark_yolo(args):
     # Print Results
     print("\n=== Benchmark Results ===")
     print(f"Device:         {device.type.upper()}")
-    # print(f"Image size:     {args.img_size}")
+    print(f"Input size:     {new_hw}")
     print(f"Median Latency: {median_latency:.2f} ms")
     print(f"P95 Latency:    {p95_latency:.2f} ms")
     if device.type == "cuda":
@@ -152,7 +138,6 @@ def benchmark_yolo(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark latency of YOLO detector.")
-    # TODO: Subcommand for synthetic / kitti?
     parser.add_argument(
         "--model-path",
         default=YOLOv11n,
@@ -166,11 +151,10 @@ if __name__ == "__main__":
         required=False,
         help="Path to KITTI sequence.",
     )
-    parser.add_argument("--kitti-scale", type=float, default=1.0)
-    parser.add_argument("--img-size", type=int, default=640)
-    parser.add_argument("--n-runs", type=int, default=100)
+    parser.add_argument("--scale", type=float, default=1.0)
     parser.add_argument("--n-warmup-runs", type=int, default=100)
     parser.add_argument("--device", default="cuda")
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
     # Run the benchmark

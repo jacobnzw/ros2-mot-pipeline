@@ -23,6 +23,36 @@ Object motion follows a constant velocity model. The bounding box location
 observation model).
 
 
+## Inference Latency Measurement
+```python
+start_event = torch.cuda.Event(enable_timing=True)
+start_event.record()
+```
+For `start_event.record()` queues a marker on the current CUDA stream; it doesn’t start a CPU stopwatch. 
+If Python/Ultralytics takes time before queuing GPU work, the stream can sit idle after that marker. 
+That idle gap can therefore appear in the event interval. The events measure stream elapsed time, not just the sum of 
+GPU kernels. If your goal is kernel-only time, use a profiler; if your goal is how long model(input) takes to return 
+with GPU work complete, your synchronized `perf_counter` timing is the clearer metric.
+
+`DataLoader` gives you a CPU tensor, and Ultralytics’ prediction path moves tensor inputs to the model’s device. 
+Leaving that transfer inside `model(input)` means your wall-clock measurement includes it. 
+Move it to CUDA yourself only if you deliberately want to exclude host-to-device transfer, and do so before starting the timer.
+
+Hence wall-clock CPU time is preferred using `time.perf_counter()`
+```python
+# ...
+
+torch.cuda.synchronize()  # Wait for the GPU to finish any current work
+start_time = time.perf_counter()
+
+_ = model(input, verbose=False)  # GPU works ...
+
+torch.cuda.synchronize()  # Wait for the GPU to finish
+latency_ms = (time.perf_counter() - start_time) * 1000
+
+# ...
+```
+
 
 ## ONNX & TensorRT
 

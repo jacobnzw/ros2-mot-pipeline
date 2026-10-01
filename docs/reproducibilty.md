@@ -62,17 +62,25 @@ Class Remapping Table
 
 
 ## PC Baseline
+Reproduce with
+```shell
+uv run scripts/yolo_latency_bench.py --kitti-seq path/to/downloaded/kitti/left_color/training/image_02/0019
+```
+Numbers should be similar
+
+Results
 
 | Metric | Value |
 |---|---|
 | Device | nVidia RTX3090 24GB VRAM  |
-| Input resolution | (352, 1216)  |
 | Dataset | KITTI Tracking 0019  |
+| Input resolution | (352, 1216)  |
+| Frames | 1059  |
 | Median Latency | 12.91 ms |
 | P95 Latency | 14.43 ms |
 | GPU Peak Memory | 82.03 MB |
 
-Using image resolution: `(352, 1216)` as that's the closest multiple of `32` to the original `(375, 1242)`, required by the YOLO11-N detector.
+Using image resolution `(352, 1216)` as that's the closest multiple of `32` to the original `(375, 1242)`, required by the YOLO11-N detector.
 
 <!-- ![Baseline Latency](../results/figures/yolo_latency_histogram_baseline.png) -->
 <p align="center">

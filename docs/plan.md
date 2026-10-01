@@ -52,10 +52,10 @@ Results
 - [x] Detector and tracker chosen.
 - [x] Datasets selected and partially downloaded.
 - [x] Architecture diagram drafted.
-- [ ] Establish HW baseline: 
-  - [ ] Run YOLO detector on 200 frames
-  - [ ] Record median/p95 latency + peak memory on this machine.
-- [ ] Environment reproducible
+- [x] Establish HW baseline: 
+  - [x] Run YOLO detector on 200 frames
+  - [x] Record median/p95 latency + peak memory on this machine.
+- [x] Environment reproducible
 
 
 ### Weeks 1–2: Offline baseline (20–25 h)
