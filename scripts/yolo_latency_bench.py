@@ -9,6 +9,8 @@ from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 from ultralytics import YOLO
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 YOLOv11n = "models/yolo/yolo11n.pt"
 
@@ -119,6 +121,15 @@ def benchmark_yolo(args):
     median_latency = np.median(latencies)
     p95_latency = np.percentile(latencies, 95)
 
+    # Plot latency distribution.
+    sns.histplot(latencies, bins="auto", kde=True)
+    plt.xlabel("Latency (ms)")
+    plt.ylabel("Count")
+    plt.title("YOLO Latency Distribution")
+    plt.tight_layout()
+    plt.savefig("results/figures/yolo_latency_histogram_baseline.png")
+    plt.close()
+
     # Measure Peak Memory
     if device.type == "cuda":
         # Returns memory in bytes, convert to Megabytes
@@ -141,6 +152,7 @@ def benchmark_yolo(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark latency of YOLO detector.")
+    # TODO: Subcommand for synthetic / kitti?
     parser.add_argument(
         "--model-path",
         default=YOLOv11n,

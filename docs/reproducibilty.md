@@ -59,3 +59,22 @@ Class Remapping Table
 | Cyclist | person + bicycle | Usually treat as Pedestrian (or ignore) |
 | Tram | train / bus | Optional / ignore |
 | Misc / DontCare | — | Discard |
+
+
+## PC Baseline
+
+| Metric | Value |
+|---|---|
+| Device | nVidia RTX3090 24GB VRAM  |
+| Input resolution | (352, 1216)  |
+| Dataset | KITTI Tracking 0019  |
+| Median Latency | 12.91 ms |
+| P95 Latency | 14.43 ms |
+| GPU Peak Memory | 82.03 MB |
+
+Using image resolution: `(352, 1216)` as that's the closest multiple of `32` to the original `(375, 1242)`, required by the YOLO11-N detector.
+
+<!-- ![Baseline Latency](../results/figures/yolo_latency_histogram_baseline.png) -->
+<p align="center">
+  <img src="../results/figures/yolo_latency_histogram_baseline.png" height="400">
+</p>
