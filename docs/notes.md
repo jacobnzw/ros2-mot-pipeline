@@ -23,7 +23,7 @@ Object motion follows a constant velocity model. The bounding box location
 observation model).
 
 
-## Inference Latency Measurement
+## Per-Frame Inference-Call Latency Measurement
 ```python
 start_event = torch.cuda.Event(enable_timing=True)
 start_event.record()
@@ -52,6 +52,17 @@ latency_ms = (time.perf_counter() - start_time) * 1000
 
 # ...
 ```
+
+On CUDA, the synchronized `perf_counter()` timing waits for the call’s GPU work to finish, so it captures more than just GPU kernel time: it includes CPU work inside `model(...)` and any input transfer Ultralytics performs there. It excludes KITTI loading and resizing, which happen before the timed call.
+
+**For a meaningful Jetson comparison**, run the same script and metric on both devices with 
+- the same model weights, 
+- KITTI frames, 
+- resolution, 
+- precision, and 
+- warmup count. 
+
+Keep the Jetson power mode and thermal conditions consistent, and label the result “inference-call latency,” not “GPU-only latency.” Your per-frame median and p95 are useful; repeat the benchmark in multiple runs to see how much the results vary.
 
 
 ## ONNX & TensorRT

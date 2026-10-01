@@ -109,7 +109,7 @@ def benchmark_yolo(args):
     sns.histplot(latencies, bins="auto", kde=True)
     plt.xlabel("Latency (ms)")
     plt.ylabel("Count")
-    plt.title("YOLO Latency Distribution")
+    plt.title("YOLO Inference-Call Latency Distribution")
     plt.tight_layout()
     histogram_path = "results/figures/yolo_latency_histogram_baseline.png"
     plt.savefig(histogram_path)
@@ -137,7 +137,7 @@ def benchmark_yolo(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Benchmark latency of YOLO detector.")
+    parser = argparse.ArgumentParser(description="Benchmark inference-call latency of YOLO detector.")
     parser.add_argument(
         "--model-path",
         default=YOLOv11n,
