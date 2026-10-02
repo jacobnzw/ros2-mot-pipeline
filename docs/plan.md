@@ -64,26 +64,27 @@ Results
 
 #### Results to achieve
 
-- [ ] YOLOv8-N/YOLO11-N running on the chosen sequences.
-- [ ] ByteTrack integrated (switch to OC-SORT after 4 h max if integration fails).
+- [ ] YOLO11-N + ByteTrack running on the chosen sequences.
 - [ ] Annotated output video with track IDs.
 - [ ] Basic detection and tracking metrics recorded.
 
 #### Measurements
 
-- [ ] Detection latency (median, p95, p99) and throughput.
+- [ ] Tracker latency (median, p95, p99) and throughput.
 - [ ] Tracking metrics (MOTA/IDF1/HOTA or ID switches + fragmentation).
 - [ ] Peak CPU/GPU memory and utilisation.
-- [ ] ONNX file size and numerical difference vs PyTorch.
 
-#### Timeboxing
+#### Risks
 
-- Tracker debugging ≤ 4 h → switch.
-- TensorRT debugging ≤ 6 h → fall back to ONNX Runtime and document.
+Main concern is getting ROS2 middleware experience.
+
+IF we care about tracker correctness:
+- ByteTrack doesn't ego-motion compensate: suitable for KITTI?
+
 
 #### Exit / pivot
 
-A valid result is a clean offline Python pipeline + ONNX path even if TensorRT fails.
+A valid result is a clean offline Python pipeline
 
 
 ### Weeks 3-5: ROS2 Middleware (30 - 35h)
@@ -92,7 +93,7 @@ A valid result is a clean offline Python pipeline + ONNX path even if TensorRT f
 
 #### Results to achieve
 
-- [ ] Three Python ROS2 nodes with clear interfaces.
+- [ ] Python ROS2 nodes with clear interfaces.
 - [ ] Bounded queues (depth 1–3).
 - [ ] Correct timestamp propagation (sensor time, not wall time).
 - [ ] Deterministic bag/file replay command.

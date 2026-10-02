@@ -33,7 +33,7 @@ class KittiImages(Dataset):
         return img
 
 
-def _model_latency(model, input, device) -> float:
+def _model_latency(model: YOLO, input: torch.Tensor, tracker: bool, device) -> float:
     if device.type == "cuda":
         # GPU precise timing using CUDA events
         # start_event = torch.cuda.Event(enable_timing=True)
@@ -43,7 +43,11 @@ def _model_latency(model, input, device) -> float:
         torch.cuda.synchronize()  # Wait for the GPU to finish any current work
         start_time = time.perf_counter()
 
-        _ = model(input, verbose=False)  # GPU works ...
+        # TODO: DRY: potential rewrite using decorators?
+        if tracker:  # benchmark the detecor + tracker latency
+            _ = model.track(input, verbose=False)  # GPU works ...
+        else:  # ... only detector latency
+            _ = model.predict(input, verbose=False)
 
         torch.cuda.synchronize()  # Wait for the GPU to finish
         latency_ms = (time.perf_counter() - start_time) * 1000
@@ -52,13 +56,16 @@ def _model_latency(model, input, device) -> float:
     else:
         # CPU timing
         start_time = time.perf_counter()
-        _ = model(input, verbose=False)
+        if tracker:  # benchmark the detecor + tracker latency
+            _ = model.track(input, verbose=False)  # GPU works ...
+        else:  # ... only detector latency
+            _ = model.predict(input, verbose=False)
         latency_ms = (time.perf_counter() - start_time) * 1000  # Convert to ms
 
     return latency_ms
 
 
-def benchmark_yolo(args):
+def benchmark(args):
 
     torch.manual_seed(args.seed)
 
@@ -81,7 +88,7 @@ def benchmark_yolo(args):
     dummy_input /= dummy_input.max()
     print("Running warmup...")
     for _ in range(args.n_warmup_runs):
-        _ = model(dummy_input, verbose=False)
+        _ = model.predict(dummy_input, verbose=False)
 
     if device.type == "cuda":
         torch.cuda.synchronize()
@@ -97,8 +104,8 @@ def benchmark_yolo(args):
 
     latencies = []
     for img in loader:
-        # TODO: shouldn't img be transfered to GPU??
-        latency_ms = _model_latency(model, img, device)
+        # Input tensor `img` transfered to device by ultralytics API
+        latency_ms = _model_latency(model, img, args.tracker, device)
         latencies.append(latency_ms)
 
     # Calculate Latency Percentiles
@@ -109,9 +116,10 @@ def benchmark_yolo(args):
     sns.histplot(latencies, bins="auto", kde=True)
     plt.xlabel("Latency (ms)")
     plt.ylabel("Count")
-    plt.title("YOLO Inference-Call Latency Distribution")
+    measured_entity = "YOLO+ByteTrack" if args.tracker else "YOLO"
+    plt.title(f"{measured_entity} Inference-Call Latency Distribution")
     plt.tight_layout()
-    histogram_path = "results/figures/yolo_latency_histogram_baseline.png"
+    histogram_path = f"results/figures/{measured_entity.lower()}_latency_histogram_baseline.png"
     plt.savefig(histogram_path)
     plt.close()
     print(f"Latency histogram saved: {histogram_path}")
@@ -127,7 +135,7 @@ def benchmark_yolo(args):
         mem_type = "CPU Memory tracking requires separate profile"
 
     # Print Results
-    print("\n=== Benchmark Results ===")
+    print(f"\n=== {measured_entity} Benchmark Results ===")
     print(f"Device:         {device.type.upper()}")
     print(f"Input size:     {new_hw}")
     print(f"Median Latency: {median_latency:.2f} ms")
@@ -137,7 +145,7 @@ def benchmark_yolo(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Benchmark inference-call latency of YOLO detector.")
+    parser = argparse.ArgumentParser(description="Benchmark inference-call latency of YOLO + ByteTrack.")
     parser.add_argument(
         "--model-path",
         default=YOLOv11n,
@@ -155,7 +163,13 @@ if __name__ == "__main__":
     parser.add_argument("--n-warmup-runs", type=int, default=100)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--tracker",
+        action="store_true",
+        default=False,
+        help="Latency of detector + tracker is measured. Default: only detector latency measured.",
+    )
     args = parser.parse_args()
 
     # Run the benchmark
-    benchmark_yolo(args)
+    benchmark(args)

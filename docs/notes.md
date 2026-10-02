@@ -1,5 +1,5 @@
 
-Terminology
+# Terminology
 | Term | Meaning |
 |---|---|
 | Trajectory | Actual path the object travels in the scene. |
@@ -8,22 +8,48 @@ Terminology
 
 
 # ByteTrack
+Available via `ultralytics` directly
+```python
+from ultralytics import YOLO
+from ultralytics.tracker import TRACKERS
 
+# Uses default bytetrack thresholds
+model = YOLO("yolo11n.pt")
+# YOLO detections w/ conf >= 0.1 passed to ByteTrack to handle the thresholding
+result = model.track(frame, conf=0.1, tracker="bytetrack.yaml")  
+
+
+# For more control over ByteTrack thresholds
+bytetrack_args = TRACKERS['bytetrack']
+bytetrack_args['track_high_thresh'] = 0.6   # Raise for cleaner tracks
+bytetrack_args['new_track_thresh'] = 0.5    # Lower to prevent unassigned tracks
+bytetrack_args['track_buffer'] = 60         # Keep lost targets in memory longer (60 frames)
+
+results = model.track(frame, tracker=bytetrack_args)
+
+# Works directly on videos too
+model.track(source="video.mp4", tracker=bytetrack_args)
+```
+
+Uses
+```
 A simple Kalman filter for tracking bounding boxes *in image space*.
 
 The 8-dimensional state space
-```
+
     x, y, a, h, vx, vy, va, vh
-```
-contains the bounding box center position `(x, y)`, aspect ratio `a`, height `h`,
+
+contains the bounding box center position (x, y), aspect ratio a, height h,
 and their respective velocities.
 
 Object motion follows a constant velocity model. The bounding box location
-`(x, y, a, h)` is taken as direct observation of the state space (linear
+(x, y, a, h) is taken as direct observation of the state space (linear
 observation model).
+```
 
 
-## Per-Frame Inference-Call Latency Measurement
+
+# Per-Frame Inference-Call Latency Measurement
 ```python
 start_event = torch.cuda.Event(enable_timing=True)
 start_event.record()
@@ -65,7 +91,7 @@ On CUDA, the synchronized `perf_counter()` timing waits for the call’s GPU wor
 Keep the Jetson power mode and thermal conditions consistent, and label the result “inference-call latency,” not “GPU-only latency.” Your per-frame median and p95 are useful; repeat the benchmark in multiple runs to see how much the results vary.
 
 
-## ONNX & TensorRT
+# ONNX & TensorRT
 
 > Always export to ONNX first. It's the de facto standard intermediate, and NVIDIA's own docs frame it as the primary path: "You typically start from a trained model exported to ONNX."
 
@@ -75,7 +101,7 @@ Keep the Jetson power mode and thermal conditions consistent, and label the resu
 - **TensorRT's primary input IS the ONNX parser.** Even when people say "go straight to TensorRT," they usually mean "skip ONNX Runtime" — not "skip the ONNX file." The OnnxParser is the standard ingestion path.
 
 
-### Practical recommendation
+## Practical recommendation
 ```
 PyTorch model
     │
