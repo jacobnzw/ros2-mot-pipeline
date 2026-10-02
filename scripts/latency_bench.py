@@ -40,6 +40,7 @@ def _model_latency(model: YOLO, input: torch.Tensor, tracker: bool, device) -> f
         torch.cuda.synchronize()  # Wait for the GPU to finish any current work
 
     start_time = time.perf_counter()
+    # FIXME: missing tracker="bytetrack.yaml"
     infer(input, verbose=False)
 
     if device.type == "cuda":

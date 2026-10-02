@@ -20,19 +20,3 @@ flowchart LR
 
 - Python (`rclpy`) for the entire Phase 1.
 - C++ rewrite of the hot path is explicitly deferred (optional later exercise).
-
-## TODO
-
-- [x] Select and partially download the datasets
-    - [ ] KITTI Tracking to MCAP
-- [x] Lock the detector and tracker (YOLOv8-N / YOLO11-N + ByteTrack)
-    - [ ] Download YOLOv11-n
-    - [ ] Download ByteTrack
-    - [x] Record the exact model weights and library versions you will use.
-- [ ] Run the hardware baseline (critical checkpoint)
-    - Load the chosen YOLO model.
-    - Run inference on ~200 frames from the selected sequence.
-    - Record median and p95 latency + peak memory on the current machine.
-    - Write the numbers down immediately.
-    
-    ➡️ Checkpoint: Environment must be reproducible and the hardware baseline numbers written down. If either is missing, stop and fix it before proceeding to Weeks 1-2

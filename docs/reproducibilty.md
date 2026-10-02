@@ -86,3 +86,6 @@ Using image resolution `(352, 1216)` as that's the closest multiple of `32` to t
 <p align="center">
   <img src="../results/figures/yolo_latency_histogram_baseline.png" height="400">
 </p>
+<p align="center">
+  <img src="../results/figures/yolo+bytetrack_latency_histogram_baseline.png" height="400">
+</p>
