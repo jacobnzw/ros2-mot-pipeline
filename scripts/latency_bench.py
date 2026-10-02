@@ -34,35 +34,18 @@ class KittiImages(Dataset):
 
 
 def _model_latency(model: YOLO, input: torch.Tensor, tracker: bool, device) -> float:
+    infer = model.track if tracker else model.predict
+
     if device.type == "cuda":
-        # GPU precise timing using CUDA events
-        # start_event = torch.cuda.Event(enable_timing=True)
-        # end_event = torch.cuda.Event(enable_timing=True)
-
-        # start_event.record()
         torch.cuda.synchronize()  # Wait for the GPU to finish any current work
-        start_time = time.perf_counter()
 
-        # TODO: DRY: potential rewrite using decorators?
-        if tracker:  # benchmark the detecor + tracker latency
-            _ = model.track(input, verbose=False)  # GPU works ...
-        else:  # ... only detector latency
-            _ = model.predict(input, verbose=False)
+    start_time = time.perf_counter()
+    infer(input, verbose=False)
 
+    if device.type == "cuda":
         torch.cuda.synchronize()  # Wait for the GPU to finish
-        latency_ms = (time.perf_counter() - start_time) * 1000
-        # end_event.record()
-        # latency_ms = start_event.elapsed_time(end_event)  # Returns milliseconds
-    else:
-        # CPU timing
-        start_time = time.perf_counter()
-        if tracker:  # benchmark the detecor + tracker latency
-            _ = model.track(input, verbose=False)  # GPU works ...
-        else:  # ... only detector latency
-            _ = model.predict(input, verbose=False)
-        latency_ms = (time.perf_counter() - start_time) * 1000  # Convert to ms
 
-    return latency_ms
+    return (time.perf_counter() - start_time) * 1000
 
 
 def benchmark(args):
