@@ -30,6 +30,56 @@ class KittiImages(Dataset):
         return img
 
 
+def create_prediction_row(frame, track_id, kitti_class_id, left, top, right, bottom, score) -> str:
+    """Prepares prediction to be written as a row in KITTI label format.
+
+    KITTI Label Format:
+
+    1    frame        Frame within the sequence where the object appearers
+    1    track id     Unique tracking id of this object within this sequence
+    1    type         Describes the type of object: 'Car', 'Van', 'Truck',
+                        'Pedestrian', 'Person_sitting', 'Cyclist', 'Tram',
+                        'Misc' or 'DontCare'
+    1    truncated    Integer (0,1,2) indicating the level of truncation.
+                        Note that this is in contrast to the object detection
+                        benchmark where truncation is a float in [0,1].
+    1    occluded     Integer (0,1,2,3) indicating occlusion state:
+                        0 = fully visible, 1 = partly occluded
+                        2 = largely occluded, 3 = unknown
+    1    alpha        Observation angle of object, ranging [-pi..pi]
+    4    bbox         2D bounding box of object in the image (0-based index):
+                        contains left, top, right, bottom pixel coordinates
+    3    dimensions   3D object dimensions: height, width, length (in meters)
+    3    location     3D object location x,y,z in camera coordinates (in meters)
+    1    rotation_y   Rotation ry around Y-axis in camera coordinates [-pi..pi]
+
+    1    score        Only for results: Float, indicating confidence in
+                        detection, needed for p/r curves, higher is better.
+    """
+
+    row = [
+        frame,
+        track_id,
+        kitti_class_id,
+        0,
+        0,
+        0,
+        left,
+        top,
+        right,
+        bottom,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        score,
+    ]
+    return " ".join(map(str, row))
+
+
 def mot_metrics_to_kitti_file(args):
 
     torch.manual_seed(args.seed)
@@ -93,7 +143,7 @@ def mot_metrics_to_kitti_file(args):
                     track_ids, model_class_ids, xyxys, confidences
                 ):
                     class_name = str(model.names[model_class_id]).lower()
-                    kitti_class_id = class_ids.get(class_name, "DontCare")
+                    kitti_class_id = class_ids.get(class_name, None)
                     if kitti_class_id is None:
                         continue
 
@@ -103,48 +153,8 @@ def mot_metrics_to_kitti_file(args):
                     top = min(top * scale_y, KittiImages.HEIGHT)
                     bottom = min(bottom * scale_y, KittiImages.HEIGHT)
 
-                    # 1    frame        Frame within the sequence where the object appearers
-                    # 1    track id     Unique tracking id of this object within this sequence
-                    # 1    type         Describes the type of object: 'Car', 'Van', 'Truck',
-                    #                     'Pedestrian', 'Person_sitting', 'Cyclist', 'Tram',
-                    #                     'Misc' or 'DontCare'
-                    # 1    truncated    Integer (0,1,2) indicating the level of truncation.
-                    #                     Note that this is in contrast to the object detection
-                    #                     benchmark where truncation is a float in [0,1].
-                    # 1    occluded     Integer (0,1,2,3) indicating occlusion state:
-                    #                     0 = fully visible, 1 = partly occluded
-                    #                     2 = largely occluded, 3 = unknown
-                    # 1    alpha        Observation angle of object, ranging [-pi..pi]
-                    # 4    bbox         2D bounding box of object in the image (0-based index):
-                    #                     contains left, top, right, bottom pixel coordinates
-                    # 3    dimensions   3D object dimensions: height, width, length (in meters)
-                    # 3    location     3D object location x,y,z in camera coordinates (in meters)
-                    # 1    rotation_y   Rotation ry around Y-axis in camera coordinates [-pi..pi]
-
-                    # 1    score        Only for results: Float, indicating confidence in
-                    #                     detection, needed for p/r curves, higher is better.
-
-                    row = [
-                        frame,
-                        track_id,
-                        kitti_class_id,
-                        0,
-                        0,
-                        0,
-                        left,
-                        top,
-                        right,
-                        bottom,
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        score,
-                    ]
-                    output.write(" ".join(map(str, row)) + "\n")
+                    row = create_prediction_row(frame, track_id, kitti_class_id, left, top, right, bottom, score)
+                    output.write(row + "\n")
 
     print(f"Prediction written to: {outpath}")
 
