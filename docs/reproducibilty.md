@@ -106,14 +106,18 @@ Class Remapping Table
 | Misc / DontCare | — | Discard |
 
 
-## PC Baseline
+## Latency
+
+### Detector: YOLO11-n
 Reproduce with
 ```shell
-uv run scripts/yolo_latency_bench.py --kitti-seq path/to/downloaded/kitti/left_color/training/image_02/0019
+uv run scripts/latency_bench.py --kitti-seq path/to/downloaded/kitti/left_color/training/image_02/0019
 ```
-Numbers should be similar
+Numbers should be similar. Exactly the same numbers impossible due to varying CPU/GPU load.
 
-Results
+Using image resolution `(352, 1216)` as that's the closest multiple of `32` to the original `(375, 1242)`, required by the YOLO11-N detector.
+
+**Results**
 
 | Metric | Value |
 |---|---|
@@ -125,12 +129,30 @@ Results
 | P95 Latency | 14.43 ms |
 | GPU Peak Memory | 82.03 MB |
 
-Using image resolution `(352, 1216)` as that's the closest multiple of `32` to the original `(375, 1242)`, required by the YOLO11-N detector.
-
-<!-- ![Baseline Latency](../results/figures/yolo_latency_histogram_baseline.png) -->
 <p align="center">
   <img src="../results/figures/yolo_latency_histogram_baseline.png" height="400">
 </p>
+
+### Tracker: ByteTrack
+Reproduce with
+```shell
+uv run scripts/latency_bench.py --kitti-seq path/to/downloaded/kitti/left_color/training/image_02/0019 --tracker
+```
+
+Measuring YOLO + ByteTrack inference-call latency.
+
+**Results**
+
+| Metric | Value |
+|---|---|
+| Device | nVidia RTX3090 24GB VRAM  |
+| Dataset | KITTI Tracking 0019  |
+| Input resolution | (352, 1216)  |
+| Frames | 1059  |
+| Median Latency | 28.28 ms |
+| P95 Latency | 33.16 ms |
+| GPU Peak Memory | 86.63 MB |
+
 <p align="center">
   <img src="../results/figures/yolo+bytetrack_latency_histogram_baseline.png" height="400">
 </p>
