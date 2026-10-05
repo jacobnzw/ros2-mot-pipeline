@@ -195,3 +195,90 @@ Compute TrackEval MOT metrics with
 ```shell
 uv run scripts/mot_trackeval.py  
 ```
+
+### Baseline
+Evaluated on sequence `0019` only. For now!
+
+Achieved results are as follows:
+```
+Evaluating bytetrack
+
+1 eval_sequence(0019, bytetrack)                                         0.7266 sec
+
+All sequences for bytetrack finished in 0.73 seconds
+
+HOTA: bytetrack-car                HOTA      DetA      AssA      DetRe     DetPr     AssRe     AssPr     LocA      OWTA      HOTA(0)   LocA(0)   HOTALocA(0)
+0019                               49.423    52.537    46.825    62.342    64.794    49.148    77.658    78.67     53.955    66.096    73.79     48.773    
+COMBINED                           49.423    52.537    46.825    62.342    64.794    49.148    77.658    78.67     53.955    66.096    73.79     48.773    
+
+CLEAR: bytetrack-car               MOTA      MOTP      MODA      CLR_Re    CLR_Pr    MTR       PTR       MLR       sMOTA     CLR_TP    CLR_FN    CLR_FP    IDSW      MT        PT        ML        Frag      
+0019                               60.562    75.468    62.271    79.243    82.36     50        50        0         41.121    649       170       139       14        3         3         0         10        
+COMBINED                           60.562    75.468    62.271    79.243    82.36     50        50        0         41.121    649       170       139       14        3         3         0         10        
+
+Identity: bytetrack-car            IDF1      IDR       IDP       IDTP      IDFN      IDFP      
+0019                               63.348    62.149    64.594    509       310       279       
+COMBINED                           63.348    62.149    64.594    509       310       279       
+
+Count: bytetrack-car               Dets      GT_Dets   IDs       GT_IDs    
+0019                               788       819       27        6         
+COMBINED                           788       819       27        6         
+
+HOTA: bytetrack-pedestrian         HOTA      DetA      AssA      DetRe     DetPr     AssRe     AssPr     LocA      OWTA      HOTA(0)   LocA(0)   HOTALocA(0)
+0019                               39.351    42.823    36.533    50.037    58.04     41.609    61.603    72.887    42.693    61.861    63.982    39.58     
+COMBINED                           39.351    42.823    36.533    50.037    58.04     41.609    61.603    72.887    42.693    61.861    63.982    39.58     
+
+CLEAR: bytetrack-pedestrian        MOTA      MOTP      MODA      CLR_Re    CLR_Pr    MTR       PTR       MLR       sMOTA     CLR_TP    CLR_FN    CLR_FP    IDSW      MT        PT        ML        Frag      
+0019                               46.561    67.89     48.247    67.228    77.982    25.806    69.355    4.8387    24.974    3949      1925      1115      99        16        43        3         244       
+COMBINED                           46.561    67.89     48.247    67.228    77.982    25.806    69.355    4.8387    24.974    3949      1925      1115      99        16        43        3         244       
+
+Identity: bytetrack-pedestrian     IDF1      IDR       IDP       IDTP      IDFN      IDFP      
+0019                               56.519    52.622    61.039    3091      2783      1973      
+COMBINED                           56.519    52.622    61.039    3091      2783      1973      
+
+Count: bytetrack-pedestrian        Dets      GT_Dets   IDs       GT_IDs    
+0019                               5064      5874      176       62        
+COMBINED                           5064      5874      176       62
+```
+
+with the following TrackEval config summary:
+```
+Kitti2DBox Config:
+GT_FOLDER            : data/kitti/left_color/training
+TRACKERS_FOLDER      : data/kitti/trackers           
+TRACKERS_TO_EVAL     : ['bytetrack']                 
+SPLIT_TO_EVAL        : training                      
+CLASSES_TO_EVAL      : ['car', 'pedestrian']         
+OUTPUT_FOLDER        :                               
+INPUT_AS_ZIP         : False                         
+PRINT_CONFIG         : True                          
+TRACKER_SUB_FOLDER   : data                          
+OUTPUT_SUB_FOLDER    :                               
+TRACKER_DISPLAY_NAMES : None                          
+Reading from seqmap_file='data/kitti/left_color/training/evaluate_tracking.seqmap.training'...
+
+CLEAR Config:
+THRESHOLD            : 0.5                           
+PRINT_CONFIG         : True                          
+
+Identity Config:
+THRESHOLD            : 0.5                           
+PRINT_CONFIG         : True                          
+
+Eval Config:
+USE_PARALLEL         : False                         
+PRINT_RESULTS        : True                          
+OUTPUT_SUMMARY       : True                          
+NUM_PARALLEL_CORES   : 8                             
+BREAK_ON_ERROR       : True                          
+RETURN_ON_ERROR      : False                         
+LOG_ON_ERROR         : /home/jacob/ros2-mot-pipeline/.venv/lib/python3.14/site-packages/error_log.txt
+PRINT_ONLY_COMBINED  : False                         
+PRINT_CONFIG         : True                          
+TIME_PROGRESS        : True                          
+DISPLAY_LESS_PROGRESS : True                          
+OUTPUT_EMPTY_CLASSES : True                          
+OUTPUT_DETAILED      : True                          
+PLOT_CURVES          : True                          
+
+Evaluating 1 tracker(s) on 1 sequence(s) for 2 class(es) on Kitti2DBox dataset using the following metrics: HOTA, CLEAR, Identity, Count
+```
