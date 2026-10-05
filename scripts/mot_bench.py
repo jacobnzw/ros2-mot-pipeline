@@ -2,6 +2,7 @@ import argparse
 import math
 from pathlib import Path
 
+import cv2
 import torch
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
@@ -125,11 +126,31 @@ def mot_metrics_to_kitti_file(args):
     outdir.mkdir(parents=True, exist_ok=True)
     outpath = outdir / f"{seq_id}.txt"
 
+    if args.video:
+        video_path = outpath.with_suffix(".mp4")
+
+        print(f"Creating video under {video_path}")
+
+        writer = cv2.VideoWriter(
+            str(video_path),
+            cv2.VideoWriter_fourcc(*"mp4v"),
+            10,  # KITTI tracking sequences are 10 FPS
+            (KittiImages.WIDTH, KittiImages.HEIGHT),
+        )
+        if not writer.isOpened():
+            raise RuntimeError(f"Could not open video writer: {video_path}")
+
     with open(outpath, "w") as output:
         for frame, img in tqdm(enumerate(loader), total=len(dataset)):
             results = model.track(img, tracker="bytetrack.yaml", persist=True, verbose=False)
 
             for result in results:
+                if args.video:
+                    # plot() returns a BGR image; resize it back to the original frame dimensions.
+                    frame_bgr = result.plot()
+                    frame_bgr = cv2.resize(frame_bgr, (KittiImages.WIDTH, KittiImages.HEIGHT))
+                    writer.write(frame_bgr)
+
                 boxes = result.boxes
                 if boxes.id is None:
                     continue
@@ -181,6 +202,7 @@ if __name__ == "__main__":
         type=str,
         help="Output folder for tracker predictions in KITTI TXT format.",
     )
+    parser.add_argument("--video", action="store_true", help="Whether to write predictions to video frames in *.mp4.")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--scale", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=42)
