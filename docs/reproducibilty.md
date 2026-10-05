@@ -156,3 +156,42 @@ Measuring YOLO + ByteTrack inference-call latency.
 <p align="center">
   <img src="../results/figures/yolo+bytetrack_latency_histogram_baseline.png" height="400">
 </p>
+
+
+## MOT Metrics
+
+### TrackEval Dataset Config
+
+```python
+dataset_config = {
+    "GT_FOLDER": "data/kitti/left_color/training",
+    # Tracker predictions in a text file in KITTI format
+    "TRACKERS_FOLDER": "data/kitti/trackers", 
+    "TRACKERS_TO_EVAL": ["bytetrack"],
+    "SPLIT_TO_EVAL": "training",
+    "CLASSES_TO_EVAL": ["car", "pedestrian"],
+}
+```
+The ByteTrack predictions for sequence 0019 should be placed in 
+
+```
+data/kitti/trackers/bytetrack/data/0019.txt
+```
+Create `.seqmap` file under `{GT_FOLDER}/evaluate_tracking.seqmap.training` with file contents
+```
+0019 {GT_FOLDER}/image_02/0019 000000 001059
+```
+indicating sequence number, path, start frame, sequence length. 
+Replace `{GT_FOLDER}` in the path specs with whatever it's set to in the `dataset_config`.
+
+
+Running this will produce the prediction for sequence `0019`
+
+```shell
+uv run scripts/mot_bench.py --kitti-seq data/kitti/left_color/training/image_02/0019
+```
+
+Compute TrackEval MOT metrics with
+```shell
+uv run scripts/mot_trackeval.py  
+```
