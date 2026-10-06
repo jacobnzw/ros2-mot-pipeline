@@ -1,0 +1,169 @@
+#include "yolo_detector/onnx_model.hpp"
+
+#include <opencv2/imgproc.hpp>
+
+#include <algorithm>
+#include <cmath>
+#include <stdexcept>
+
+namespace yolo_detector
+{
+namespace
+{
+
+/**
+ * Configure graph optimizations before creating an ORT session.
+ * SessionOptions are consumed when the session is constructed; they do not
+ * hold the model or perform inference themselves.
+ */
+Ort::SessionOptions make_session_options()
+{
+  Ort::SessionOptions options;
+  options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+  return options;
+}
+
+}  // namespace
+
+/**
+ * Initialize ORT's shared environment, configure the session, and load the model.
+ * The member declaration order in the header ensures env_ exists before
+ * session_ is constructed from it.
+ */
+OnnxModel::OnnxModel(const std::string & model_path)
+: env_(ORT_LOGGING_LEVEL_WARNING, "yolo_detector"),
+  session_options_(make_session_options()),
+  session_(env_, model_path.c_str(), session_options_)
+{
+  if (session_.GetInputCount() != 1) {
+    throw std::runtime_error("Expected a model with exactly one input tensor");
+  }
+
+  // ORT allocates the name returned here. The allocated wrapper frees it when
+  // it leaves scope, so copy the text into input_name_ before that happens.
+  Ort::AllocatorWithDefaultOptions allocator;
+  auto input_name = session_.GetInputNameAllocated(0, allocator);
+  input_name_ = input_name.get();
+
+  // Cache all output names once; inference only needs to pass these names back
+  // to the session and should not query model metadata for every image.
+  const size_t output_count = session_.GetOutputCount();
+  if (output_count == 0) {
+    throw std::runtime_error("Model has no output tensors");
+  }
+  output_names_.reserve(output_count);
+  for (size_t index = 0; index < output_count; ++index) {
+    auto output_name = session_.GetOutputNameAllocated(index, allocator);
+    output_names_.emplace_back(output_name.get());
+  }
+}
+
+/**
+ * Run one image through the loaded model and return its output tensor shapes.
+ * This probe intentionally does not interpret YOLO values or apply NMS.
+ */
+std::vector<std::vector<int64_t>> OnnxModel::infer(const cv::Mat & bgr_image)
+{
+  if (bgr_image.empty()) {
+    throw std::invalid_argument("Input image is empty");
+  }
+
+  // TypeInfo owns model metadata. Keep it alive while using the tensor-shape
+  // view returned from it; otherwise that view would refer to released state.
+  const auto input_type_info = session_.GetInputTypeInfo(0);
+  const auto input_info = input_type_info.GetTensorTypeAndShapeInfo();
+  auto input_shape = input_info.GetShape();
+
+  // This first probe supports the common YOLO image input: one NCHW float
+  // tensor with three color channels. Reject other layouts rather than silently
+  // feeding them incorrectly.
+  if (input_shape.size() != 4 || (input_shape[0] > 0 && input_shape[0] != 1) ||
+      (input_shape[1] > 0 && input_shape[1] != 3))
+  {
+    std::string shape_description = "[";
+    for (size_t index = 0; index < input_shape.size(); ++index) {
+      if (index > 0) {
+        shape_description += ", ";
+      }
+      shape_description += std::to_string(input_shape[index]);
+    }
+    shape_description += "]";
+    throw std::runtime_error(
+      "Expected a single-image NCHW model input with three channels; received " + shape_description);
+  }
+
+  // A negative model dimension means it is dynamic. For this probe, use 640
+  // for a dynamic height or width; fixed export dimensions remain unchanged.
+  const int height = input_shape[2] > 0 ? static_cast<int>(input_shape[2]) : 640;
+  const int width = input_shape[3] > 0 ? static_cast<int>(input_shape[3]) : 640;
+  input_shape = {1, 3, height, width};
+
+  const float scale = std::min(
+    static_cast<float>(width) / bgr_image.cols,
+    static_cast<float>(height) / bgr_image.rows);
+  const int resized_width = static_cast<int>(std::round(bgr_image.cols * scale));
+  const int resized_height = static_cast<int>(std::round(bgr_image.rows * scale));
+
+  // Preserve aspect ratio, then pad to the model's exact dimensions. This
+  // "letterbox" step avoids stretching objects while satisfying fixed inputs.
+  cv::Mat resized;
+  cv::resize(bgr_image, resized, cv::Size(resized_width, resized_height));
+  cv::Mat letterboxed(height, width, CV_8UC3, cv::Scalar(114, 114, 114));
+  const int left = (width - resized_width) / 2;
+  const int top = (height - resized_height) / 2;
+  resized.copyTo(letterboxed(cv::Rect(left, top, resized_width, resized_height)));
+
+  // The image reader returns BGR bytes; this export expects RGB float values
+  // normalized to [0, 1]. OpenCV stores these pixels as interleaved HWC data.
+  cv::Mat rgb;
+  cv::cvtColor(letterboxed, rgb, cv::COLOR_BGR2RGB);
+  cv::Mat normalized;
+  rgb.convertTo(normalized, CV_32FC3, 1.0 / 255.0);
+
+  const size_t plane_size = static_cast<size_t>(height) * width;
+  std::vector<float> input_tensor_values(3 * plane_size);
+
+  // ONNX input shape is NCHW, so rearrange interleaved HWC pixels into three
+  // contiguous channel planes. Batch size is one, so no batch loop is needed.
+  for (int row = 0; row < height; ++row) {
+    const auto * pixels = normalized.ptr<cv::Vec3f>(row);
+    for (int column = 0; column < width; ++column) {
+      const size_t pixel_index = static_cast<size_t>(row) * width + column;
+      for (size_t channel = 0; channel < 3; ++channel) {
+        input_tensor_values[channel * plane_size + pixel_index] = pixels[column][channel];
+      }
+    }
+  }
+
+  // MemoryInfo tells ORT where the input buffer lives. CreateTensor wraps this
+  // existing CPU buffer rather than copying it; keep input_tensor_values alive
+  // until Run() finishes using it.
+  auto memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+  auto input_tensor = Ort::Value::CreateTensor<float>(
+    memory_info, input_tensor_values.data(), input_tensor_values.size(),
+    input_shape.data(), input_shape.size());
+
+  // Run() accepts arrays of input/output names and tensors. The session matches
+  // each name to the corresponding graph input or output and executes the graph.
+  std::vector<const char *> output_name_pointers;
+  output_name_pointers.reserve(output_names_.size());
+  for (const auto & name : output_names_) {
+    output_name_pointers.push_back(name.c_str());
+  }
+
+  const char * input_name = input_name_.c_str();
+  auto outputs = session_.Run(
+    Ort::RunOptions{nullptr}, &input_name, &input_tensor, 1,
+    output_name_pointers.data(), output_name_pointers.size());
+
+  // Return only dimensions for now, while the actual output values remain owned
+  // by ORT's output tensors. A detector will later decode those values to boxes.
+  std::vector<std::vector<int64_t>> output_shapes;
+  output_shapes.reserve(outputs.size());
+  for (const auto & output : outputs) {
+    output_shapes.push_back(output.GetTensorTypeAndShapeInfo().GetShape());
+  }
+  return output_shapes;
+}
+
+}  // namespace yolo_detector
