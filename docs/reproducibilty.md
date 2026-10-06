@@ -282,3 +282,22 @@ PLOT_CURVES          : True
 
 Evaluating 1 tracker(s) on 1 sequence(s) for 2 class(es) on Kitti2DBox dataset using the following metrics: HOTA, CLEAR, Identity, Count
 ```
+
+
+## ONNX Export
+
+```shell
+uv run yolo detect export model=yolo11n.pt format=onnx imgsz=352,1216
+```
+
+```shell
+ONNX: starting export with onnx 1.23.2 opset 18...
+ONNX: slimming with onnxslim 0.1.97...
+ONNX: export success ✅ 7.4s, saved as 'yolo11n.onnx' (10.3 MB)
+
+Export complete (7.9s)
+Results saved to /home/jacob/ros2-mot-pipeline/yolo11n.onnx
+Predict:         yolo predict task=detect model=yolo11n.onnx imgsz=352,1216 
+Validate:        yolo val task=detect model=yolo11n.onnx imgsz=352,1216   WARNING ⚠️ non-PyTorch val requires square images, 'imgsz=[352, 1216]' will not work. Use export 'imgsz=1216' if val is required.
+Visualize:       https://netron.app
+```

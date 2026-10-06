@@ -64,15 +64,15 @@ Results
 
 #### Results to achieve
 
-- [ ] YOLO11-N + ByteTrack running on the chosen sequences.
-- [ ] Annotated output video with track IDs.
-- [ ] Basic detection and tracking metrics recorded.
+- [x] YOLO11-N + ByteTrack running on the chosen sequences.
+- [x] Annotated output video with track IDs.
+- [x] Basic detection and tracking metrics recorded.
 
 #### Measurements
 
-- [ ] Tracker latency (median, p95, p99) and throughput.
-- [ ] Tracking metrics (MOTA/IDF1/HOTA or ID switches + fragmentation).
-- [ ] Peak CPU/GPU memory and utilisation.
+- [x] Tracker latency (median, p95, p99) and throughput.
+- [x] Tracking metrics (MOTA/IDF1/HOTA or ID switches + fragmentation).
+- [x] Peak CPU/GPU memory and utilisation.
 
 #### Risks
 
@@ -93,15 +93,20 @@ A valid result is a clean offline Python pipeline
 
 #### Results to achieve
 
-- [ ] Python ROS2 nodes with clear interfaces.
-- [ ] Bounded queues (depth 1–3).
-- [ ] Correct timestamp propagation (sensor time, not wall time).
-- [ ] Deterministic bag/file replay command.
-- [ ] Per-stage latency logging (receive → inference start → publish).
-- [ ] Basic diagnostics (queue depth, drop count).
-- [ ] Simple visualisation of tracks.
+- [ ] YOLO ONNX export for PC
+- [ ] C++ ROS2 components with clear interfaces
+  - [ ] Preprocessing + YOLO Detector component
+  - [ ] ByteTrack Tracker component
+- [ ] Metrics & Diagnostics Node
+  - [ ] Per-stage latency logging (receive → inference start → publish).
+  - [ ] Basic diagnostics (queue depth, frame drop count).
+- [ ] Visualization via Foxglove
+  - [ ] Simple visualisation of tracks.
+- [ ] Middleware Tunning
+  - [ ] Bounded queues (depth 1–3).
+  - [ ] Correct timestamp propagation (sensor time, not wall time).
 
-#### Measurements
+#### KPIs & Parameters
 
 - [ ] End-to-end latency (t_track_output – t_image_stamp).
 - [ ] Per-stage latencies (p50/p95/p99).
@@ -122,6 +127,9 @@ A valid result is a clean offline Python pipeline
 
 
 ## Phase 2: Jetson Deployment
+
+Rent Jetson at [cloudjetson.com](cloudjetson.com) (~1 USD / hr).
+
 
 > Proceed to Jetson only if:
 > - The offline PyTorch pipeline sustains roughly >15–20 FPS on your current hardware with usable tracking quality, and
