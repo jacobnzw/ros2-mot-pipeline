@@ -1,6 +1,7 @@
 #include "yolo_detector/onnx_model.hpp"
 
 #include <opencv2/imgproc.hpp>
+#include <opencv2/dnn/dnn.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -131,25 +132,17 @@ std::vector<std::vector<int64_t>> OnnxModel::infer(const cv::Mat & bgr_image)
 
   // The image reader returns BGR bytes; exported ONNX model expects RGB float values
   // normalized to [0, 1]. OpenCV stores these pixels as interleaved HWC data.
-  cv::Mat rgb;
-  cv::cvtColor(letterboxed, rgb, cv::COLOR_BGR2RGB);
-  cv::Mat normalized;
-  rgb.convertTo(normalized, CV_32FC3, 1.0 / 255.0);  // CV_32FC3 = 32-bit float w/ 3 channels
-
-  const size_t plane_size = static_cast<size_t>(height) * width;
-  std::vector<float> input_tensor_values(3 * plane_size);
-
-  // ONNX input shape is NCHW, so rearrange interleaved HWC pixels into three
-  // contiguous channel planes. Batch size is one, so no batch loop is needed.
-  for (int row = 0; row < height; ++row) {
-    const auto * pixels = normalized.ptr<cv::Vec3f>(row);
-    for (int column = 0; column < width; ++column) {
-      const size_t pixel_index = static_cast<size_t>(row) * width + column;
-      for (size_t channel = 0; channel < 3; ++channel) {
-        input_tensor_values[channel * plane_size + pixel_index] = pixels[column][channel];
-      }
-    }
-  }
+  cv::Mat input_blob;
+  cv::dnn::blobFromImage(
+    letterboxed,
+    input_blob,
+    1.0 / 255.0,    // scale pixel values to [0, 1]
+    cv::Size(),     // keep the existing image size
+    cv::Scalar(),
+    true,           // swap BGR to RGB
+    false,          // don't crop
+    CV_32F
+  );
 
   // CreateCpu builds an ORT memory descriptor for CPU memory (device "Cpu",
   // id 0). It describes memory to ORT; it does not allocate the vector.
@@ -161,7 +154,7 @@ std::vector<std::vector<int64_t>> OnnxModel::infer(const cv::Mat & bgr_image)
   // or take ownership of the vector's storage. The shape describes those
   // floats as [batch, channels, height, width] (NCHW).
   auto input_tensor = Ort::Value::CreateTensor<float>(
-    memory_info, input_tensor_values.data(), input_tensor_values.size(),
+    memory_info, input_blob.ptr<float>(), input_blob.total(),
     input_shape.data(), input_shape.size());
 
   // Run() accepts arrays of input/output names and tensors. The session matches
