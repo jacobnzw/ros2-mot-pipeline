@@ -29,6 +29,19 @@ Ort::SessionOptions make_session_options()
  * Initialize ORT's shared environment, configure the session, and load the model.
  * The member declaration order in the header ensures env_ exists before
  * session_ is constructed from it.
+ * 
+ * Ort::Env is the process-wide runtime. It owns shared infrastructure: thread pools, logging, 
+ * and (optionally) shared allocators. One per process.
+ * 
+ * Ort::Session is created from an Ort::Env — the env is passed as the first constructor argument.
+ * It loads a specific model, applies graph optimizations, and executes inference.
+ * 
+ * - If env is destroyed, all sessions referencing it become invalid. 
+ * - 1 `Env` -> N `Session`s (different models, different `SessionOptions`, etc.)
+ * - `Env` manages thread pools; sessions inherit thread behavior from it. 
+ *    Allocators registered on the env can be shared across sessions.
+ * - `SessionOptions` are per-session — 2 sessions on the same env can use different 
+ *    providers (CPU vs. GPU), different optimization levels, etc.
  */
 OnnxModel::OnnxModel(const std::string & model_path)
 : env_(ORT_LOGGING_LEVEL_WARNING, "yolo_detector"),
@@ -92,8 +105,8 @@ std::vector<std::vector<int64_t>> OnnxModel::infer(const cv::Mat & bgr_image)
       "Expected a single-image NCHW model input with three channels; received " + shape_description);
   }
 
-  // A negative model dimension means it is dynamic. For this probe, use 640
-  // for a dynamic height or width; fixed export dimensions remain unchanged.
+  // A negative model dimension ==> dynamic input size. 
+  // Use 640 as fallback for a dynamic height or width.
   const int height = input_shape[2] > 0 ? static_cast<int>(input_shape[2]) : 640;
   const int width = input_shape[3] > 0 ? static_cast<int>(input_shape[3]) : 640;
   input_shape = {1, 3, height, width};
@@ -104,8 +117,11 @@ std::vector<std::vector<int64_t>> OnnxModel::infer(const cv::Mat & bgr_image)
   const int resized_width = static_cast<int>(std::round(bgr_image.cols * scale));
   const int resized_height = static_cast<int>(std::round(bgr_image.rows * scale));
 
-  // Preserve aspect ratio, then pad to the model's exact dimensions. This
-  // "letterbox" step avoids stretching objects while satisfying fixed inputs.
+  // Letterboxing
+  // Preserve aspect ratio, then pad to the model's exact dimensions. 
+  // Avoids stretching objects while satisfying model's fixed inputs.
+  // Create blank canvas with "uninformative" color (114, 114, 114)
+  // then paste the resized image centered on the canvas
   cv::Mat resized;
   cv::resize(bgr_image, resized, cv::Size(resized_width, resized_height));
   cv::Mat letterboxed(height, width, CV_8UC3, cv::Scalar(114, 114, 114));
@@ -113,12 +129,12 @@ std::vector<std::vector<int64_t>> OnnxModel::infer(const cv::Mat & bgr_image)
   const int top = (height - resized_height) / 2;
   resized.copyTo(letterboxed(cv::Rect(left, top, resized_width, resized_height)));
 
-  // The image reader returns BGR bytes; this export expects RGB float values
+  // The image reader returns BGR bytes; exported ONNX model expects RGB float values
   // normalized to [0, 1]. OpenCV stores these pixels as interleaved HWC data.
   cv::Mat rgb;
   cv::cvtColor(letterboxed, rgb, cv::COLOR_BGR2RGB);
   cv::Mat normalized;
-  rgb.convertTo(normalized, CV_32FC3, 1.0 / 255.0);
+  rgb.convertTo(normalized, CV_32FC3, 1.0 / 255.0);  // CV_32FC3 = 32-bit float w/ 3 channels
 
   const size_t plane_size = static_cast<size_t>(height) * width;
   std::vector<float> input_tensor_values(3 * plane_size);
@@ -135,10 +151,15 @@ std::vector<std::vector<int64_t>> OnnxModel::infer(const cv::Mat & bgr_image)
     }
   }
 
-  // MemoryInfo tells ORT where the input buffer lives. CreateTensor wraps this
-  // existing CPU buffer rather than copying it; keep input_tensor_values alive
-  // until Run() finishes using it.
+  // CreateCpu builds an ORT memory descriptor for CPU memory (device "Cpu",
+  // id 0). It describes memory to ORT; it does not allocate the vector.
+  // OrtArenaAllocator selects the allocator category recorded in that
+  // descriptor. It does not move input_tensor_values into ORT's arena.
+  // OrtMemTypeDefault selects the execution provider's default memory type.
   auto memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+  // Wrap caller-owned data as a float tensor; it does not copy
+  // or take ownership of the vector's storage. The shape describes those
+  // floats as [batch, channels, height, width] (NCHW).
   auto input_tensor = Ort::Value::CreateTensor<float>(
     memory_info, input_tensor_values.data(), input_tensor_values.size(),
     input_shape.data(), input_shape.size());
@@ -151,6 +172,7 @@ std::vector<std::vector<int64_t>> OnnxModel::infer(const cv::Mat & bgr_image)
     output_name_pointers.push_back(name.c_str());
   }
 
+  // RUN INFERENCE
   const char * input_name = input_name_.c_str();
   auto outputs = session_.Run(
     Ort::RunOptions{nullptr}, &input_name, &input_tensor, 1,

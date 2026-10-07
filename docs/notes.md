@@ -9,6 +9,36 @@
 
 # Data: KITTI Tracking
 
+## Preprocessing
+**Letterboxing** is a preprocessing step that resizes an image **while preserving its aspect ratio**, then pads the remaining space (top/bottom or left/right) with a neutral fill value to reach the model's fixed input dimensions.
+
+**Why it's needed:** Most models (e.g. YOLO) expect a fixed square input like 640×640. A naive `cv2.resize()` to that size would **distort** the image — stretching or squishing objects — which degrades detection accuracy.
+
+**How it works:**
+
+1. Compute the scale factor: `scale = min(target_h / src_h, target_w / src_w)`
+2. Resize the image by that factor (aspect ratio preserved)
+3. Create a canvas of the target size filled with a padding value
+4. Paste the resized image centered on the canvas
+
+**The padding value** is typically a neutral gray — **114** (used by YOLOv8/Ultralytics) or **127** — chosen so that after normalization (e.g. dividing by 255 and scaling to [-1, 1]) the padded pixels map to **zero activation**, meaning they carry no semantic information the model would mistake for real content.
+A padded pixel at 0 contributes nothing to the dot products in the first conv layer, so the model effectively ignores it.
+```
+x_normalized = (x / 255.0 - 0.5) * 2.0   
+```
+
+**Trade-off vs. simple resize:**
+
+| | Letterbox | Simple Resize |
+|---|---|---|
+| Aspect ratio | Preserved | Distorted |
+| Compute cost | Slightly higher (padding is "wasted" pixels) | All pixels are useful |
+| Object geometry | Faithful | Skewed |
+
+The small accuracy gain from letterboxing is usually negligible for most applications, but it's the standard in object detection pipelines (YOLO, SSD, etc.) because it avoids the geometric distortion that can shift bounding box predictions.
+
+
+
 ## Object types
 | ID | Type |
 |----|------|
