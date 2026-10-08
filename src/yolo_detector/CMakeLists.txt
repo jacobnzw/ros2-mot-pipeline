@@ -9,6 +9,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(ament_cmake REQUIRED)
 find_package(OpenCV REQUIRED COMPONENTS core imgcodecs imgproc dnn)
+find_package(fmt REQUIRED)
 
 set(ONNXRUNTIME_ROOT "$ENV{ONNXRUNTIME_ROOT}" CACHE PATH "ONNX Runtime installation prefix")
 find_path(ONNXRUNTIME_INCLUDE_DIR
@@ -32,6 +33,7 @@ if(NOT ONNXRUNTIME_INCLUDE_DIR OR NOT ONNXRUNTIME_LIBRARY)
 endif()
 
 add_library(yolo_onnx src/onnx_model.cpp)
+set_target_properties(yolo_onnx PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(yolo_onnx
   PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
@@ -42,7 +44,7 @@ target_include_directories(yolo_onnx
 target_link_libraries(yolo_onnx PUBLIC "${ONNXRUNTIME_LIBRARY}" ${OpenCV_LIBS})
 
 add_executable(onnx_probe src/onnx_probe.cpp)
-target_link_libraries(onnx_probe PRIVATE yolo_onnx)
+target_link_libraries(onnx_probe PRIVATE yolo_onnx fmt::fmt)
 
 install(TARGETS yolo_onnx onnx_probe
   ARCHIVE DESTINATION lib
