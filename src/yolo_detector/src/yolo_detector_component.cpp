@@ -50,7 +50,7 @@ struct DetectionCandidate {
 };
 
 std::vector<vision_msgs::msg::Detection2D> decode_yolo_output(const InferenceResult &inference,
-                                                              const sensor_msgs::msg::Image &image,
+                                                              const std_msgs::msg::Header &header,
                                                               double confidence_threshold,
                                                               double nms_threshold) {
   if (inference.outputs.size() != 1) {
@@ -81,6 +81,7 @@ std::vector<vision_msgs::msg::Detection2D> decode_yolo_output(const InferenceRes
     return output.values[index];
   };
 
+  // TODO: understand this!
   std::vector<DetectionCandidate> candidates;
   for (int64_t candidate = 0; candidate < candidate_count; ++candidate) {
     int class_id = 0;
@@ -117,11 +118,13 @@ std::vector<vision_msgs::msg::Detection2D> decode_yolo_output(const InferenceRes
     if (x1 <= x0 || y1 <= y0) {
       continue;
     }
+    // TODO: why not: width instead of: x1 - x0
     candidates.push_back({class_id, score, cv::Rect2d(x0, y0, x1 - x0, y1 - y0)});
   }
 
-  std::vector<vision_msgs::msg::Detection2D> detections;
+  // For each COCO object class_id...
   for (int class_id = 0; class_id < static_cast<int>(kCocoClassNames.size()); ++class_id) {
+
     std::vector<cv::Rect2d> boxes;
     std::vector<float> scores;
     std::vector<size_t> candidate_indices;
@@ -133,15 +136,19 @@ std::vector<vision_msgs::msg::Detection2D> decode_yolo_output(const InferenceRes
       }
     }
 
+    // Non-Maximum Suppression: filter out BBs that have
+    // the IoU (w/ highest confidence box) < nms_threshold
     std::vector<int> retained_indices;
     cv::dnn::NMSBoxes(boxes, scores, static_cast<float>(confidence_threshold),
                       static_cast<float>(nms_threshold), retained_indices);
 
+    // Stuff detections into a std::vector
+    std::vector<vision_msgs::msg::Detection2D> detections;
     for (const int retained_index : retained_indices) {
       const auto &candidate = candidates[candidate_indices.at(static_cast<size_t>(retained_index))];
 
       vision_msgs::msg::Detection2D detection;
-      detection.header = image.header;
+      detection.header = header;
       detection.bbox.center.position.x = candidate.box.x + candidate.box.width * 0.5;
       detection.bbox.center.position.y = candidate.box.y + candidate.box.height * 0.5;
       detection.bbox.center.theta = 0.0;
@@ -152,11 +159,12 @@ std::vector<vision_msgs::msg::Detection2D> decode_yolo_output(const InferenceRes
       result.hypothesis.class_id = kCocoClassNames[class_id];
       result.hypothesis.score = candidate.score;
 
-      detection.results.push_back(std::move(result));
+      detection.results.push_back(std::move(result)); // std::vector<ObjectHypothesisWithPose>
       detections.push_back(std::move(detection));
     }
   }
 
+  // Sort detections by confidence
   std::sort(detections.begin(), detections.end(), [](const auto &left, const auto &right) {
     return left.results.front().hypothesis.score > right.results.front().hypothesis.score;
   });
@@ -172,6 +180,7 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
   // Example: -p model_path:=model/yolo/yolo11n.onnx -p image_topic:=/camera/image_raw
   declare_parameter("model_path", std::string(""));
   declare_parameter("image_topic", std::string("/image_raw"));
+  // ~ == private topic to this node; resolves using this node's name
   declare_parameter("detection_topic", std::string("~/detections"));
   declare_parameter("confidence_threshold", 0.25);
   declare_parameter("nms_threshold", 0.45);
@@ -201,7 +210,7 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
 
   // Create subscription for the image_topic and bind callback
   const auto image_topic = get_parameter("image_topic").as_string();
-  image_sub_ = create_subscription<sensor_msgs::msg::Image>(
+  image_sub_ = create_subscription<sensor_msgs::msg::CompressedImage>(
       image_topic, rclcpp::SensorDataQoS(),
       std::bind(&YoloDetectorComponent::imageCallback, this, std::placeholders::_1));
 
@@ -228,7 +237,7 @@ void YoloDetectorComponent::imageCallback(
     vision_msgs::msg::Detection2DArray detections;
     detections.header = msg->header;
     detections.detections =
-        decode_yolo_output(inference, *msg, confidence_threshold_, nms_threshold_);
+        decode_yolo_output(inference, msg->header, confidence_threshold_, nms_threshold_);
     RCLCPP_DEBUG(get_logger(), "Decoded %zu detections", detections.detections.size());
 
     detections_pub_->publish(detections);
