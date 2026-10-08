@@ -8,6 +8,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(vision_msgs REQUIRED)
+find_package(cv_bridge REQUIRED)
 find_package(OpenCV REQUIRED COMPONENTS core imgcodecs imgproc dnn)
 find_package(fmt REQUIRED)
 
@@ -46,7 +51,32 @@ target_link_libraries(yolo_onnx PUBLIC "${ONNXRUNTIME_LIBRARY}" ${OpenCV_LIBS})
 add_executable(onnx_probe src/onnx_probe.cpp)
 target_link_libraries(onnx_probe PRIVATE yolo_onnx fmt::fmt)
 
-install(TARGETS yolo_onnx onnx_probe
+add_library(yolo_detector_component SHARED src/yolo_detector_component.cpp)
+target_include_directories(yolo_detector_component
+  PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:include>"
+    "${ONNXRUNTIME_INCLUDE_DIR}"
+    ${OpenCV_INCLUDE_DIRS}
+)
+target_link_libraries(yolo_detector_component
+  PUBLIC
+    yolo_onnx
+  PRIVATE
+    fmt::fmt
+)
+ament_target_dependencies(yolo_detector_component
+  PUBLIC
+    rclcpp
+    rclcpp_components
+    sensor_msgs
+    vision_msgs
+    cv_bridge
+)
+
+rclcpp_components_register_nodes(yolo_detector_component "yolo_detector::YoloDetectorComponent")
+
+install(TARGETS yolo_onnx onnx_probe yolo_detector_component
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
