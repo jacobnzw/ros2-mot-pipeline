@@ -37,8 +37,12 @@ int main(int argc, char **argv) {
     }
 
     // infer() preprocesses the image and invokes the already-loaded ORT session.
-    // Print output dimensions to inspect the export before implementing decoding.
-    const auto output_shapes = model.infer(image);
+    const auto inference = model.infer(image);
+    std::vector<std::vector<int64_t>> output_shapes;
+    output_shapes.reserve(inference.outputs.size());
+    for (const auto &output : inference.outputs) {
+      output_shapes.push_back(output.shape);
+    }
     std::cout << fmt::format("{}", output_shapes) << std::endl;
 
   } catch (const std::exception &error) {
