@@ -1,5 +1,6 @@
 #include "yolo_detector/onnx_model.hpp"
 
+#include <fmt/ranges.h>
 #include <opencv2/imgcodecs.hpp>
 
 #include <exception>
@@ -11,8 +12,7 @@
  * @param argv Arguments: executable, model path, and optional image path.
  * @return Zero on success, two for invalid input paths/usage, one on ORT errors.
  */
-int main(int argc, char ** argv)
-{
+int main(int argc, char **argv) {
   // Require a model path, with one optional image path for an inference run.
   if (argc < 2 || argc > 3) {
     std::cerr << "Usage: onnx_probe <model.onnx> [image]" << std::endl;
@@ -39,17 +39,9 @@ int main(int argc, char ** argv)
     // infer() preprocesses the image and invokes the already-loaded ORT session.
     // Print output dimensions to inspect the export before implementing decoding.
     const auto output_shapes = model.infer(image);
-    for (size_t index = 0; index < output_shapes.size(); ++index) {
-      std::cout << "Output " << index << " shape: [";
-      for (size_t dimension = 0; dimension < output_shapes[index].size(); ++dimension) {
-        if (dimension > 0) {
-          std::cout << ", ";
-        }
-        std::cout << output_shapes[index][dimension];
-      }
-      std::cout << "]" << std::endl;
-    }
-  } catch (const std::exception & error) {
+    std::cout << fmt::format("{}", output_shapes) << std::endl;
+
+  } catch (const std::exception &error) {
     // ORT and OpenCV report failures as exceptions; convert them to a useful
     // message and nonzero process status for shell scripts and ROS launch tools.
     std::cerr << "Inference failed: " << error.what() << std::endl;
