@@ -71,10 +71,10 @@ OnnxModel::OnnxModel(const std::string &model_path)
 }
 
 /**
- * Run one image through the loaded model and return its output tensor shapes.
- * This probe intentionally does not interpret YOLO values or apply NMS.
+ * Run one image through the loaded model and copy its output tensors while the
+ * ONNX Runtime-owned values are still alive.
  */
-std::vector<std::vector<int64_t>> OnnxModel::infer(const cv::Mat &bgr_image) {
+InferenceResult OnnxModel::infer(const cv::Mat &bgr_image) {
   if (bgr_image.empty()) {
     throw std::invalid_argument("Input image is empty");
   }
@@ -103,8 +103,7 @@ std::vector<std::vector<int64_t>> OnnxModel::infer(const cv::Mat &bgr_image) {
   const int width = input_shape[3] > 0 ? static_cast<int>(input_shape[3]) : 640;
   input_shape = {1, 3, height, width};
 
-  const float scale = std::min(static_cast<float>(width) / bgr_image.cols,
-                               static_cast<float>(height) / bgr_image.rows);
+  const float scale = std::min(static_cast<float>(width) / bgr_image.cols, static_cast<float>(height) / bgr_image.rows);
   const int resized_width = static_cast<int>(std::round(bgr_image.cols * scale));
   const int resized_height = static_cast<int>(std::round(bgr_image.rows * scale));
 
@@ -141,9 +140,8 @@ std::vector<std::vector<int64_t>> OnnxModel::infer(const cv::Mat &bgr_image) {
   // Wrap caller-owned data as a float tensor; it does not copy
   // or take ownership of the vector's storage. The shape describes those
   // floats as [batch, channels, height, width] (NCHW).
-  auto input_tensor =
-      Ort::Value::CreateTensor<float>(memory_info, input_blob.ptr<float>(), input_blob.total(),
-                                      input_shape.data(), input_shape.size());
+  auto input_tensor = Ort::Value::CreateTensor<float>(memory_info, input_blob.ptr<float>(), input_blob.total(),
+                                                      input_shape.data(), input_shape.size());
 
   // Run() accepts arrays of input/output names and tensors. The session matches
   // each name to the corresponding graph input or output and executes the
@@ -156,18 +154,35 @@ std::vector<std::vector<int64_t>> OnnxModel::infer(const cv::Mat &bgr_image) {
 
   // RUN INFERENCE
   const char *input_name = input_name_.c_str();
-  auto outputs = session_.Run(Ort::RunOptions{nullptr}, &input_name, &input_tensor, 1,
-                              output_name_pointers.data(), output_name_pointers.size());
+  auto outputs = session_.Run(Ort::RunOptions{nullptr}, &input_name, &input_tensor, 1, output_name_pointers.data(),
+                              output_name_pointers.size());
 
-  // Return only dimensions for now, while the actual output values remain owned
-  // by ORT's output tensors. A detector will later decode those values to
-  // boxes.
-  std::vector<std::vector<int64_t>> output_shapes;
-  output_shapes.reserve(outputs.size());
+  InferenceResult result;
+  result.scale = scale;
+  result.pad_left = left;
+  result.pad_top = top;
+  result.original_width = bgr_image.cols;
+  result.original_height = bgr_image.rows;
+  result.outputs.reserve(outputs.size());
   for (const auto &output : outputs) {
-    output_shapes.push_back(output.GetTensorTypeAndShapeInfo().GetShape());
+    if (!output.IsTensor()) {
+      throw std::runtime_error("Expected ONNX model outputs to be tensors");
+    }
+    const auto output_info = output.GetTensorTypeAndShapeInfo();
+    if (output_info.GetElementType() != ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
+      throw std::runtime_error("Expected ONNX model outputs to contain float values");
+    }
+
+    OutputTensor tensor;
+    tensor.shape = output_info.GetShape();
+    const size_t value_count = output_info.GetElementCount();
+    const float *values = output.GetTensorData<float>();
+    // TODO: avoid copy by result.outputs.push_back(std::move(output))
+    // TODO: have result.outputs[i] thin wrap the Ort::Value data in Eigen::TensorMap and expose multi-dim access
+    tensor.values.assign(values, values + value_count);
+    result.outputs.push_back(std::move(tensor));
   }
-  return output_shapes;
+  return result;
 }
 
 } // namespace yolo_detector
