@@ -15,33 +15,18 @@ namespace yolo_detector {
 namespace {
 
 constexpr std::array<const char *, 80> kCocoClassNames{
-    "person",        "bicycle",      "car",
-    "motorcycle",    "airplane",     "bus",
-    "train",         "truck",        "boat",
-    "traffic light", "fire hydrant", "stop sign",
-    "parking meter", "bench",        "bird",
-    "cat",           "dog",          "horse",
-    "sheep",         "cow",          "elephant",
-    "bear",          "zebra",        "giraffe",
-    "backpack",      "umbrella",     "handbag",
-    "tie",           "suitcase",     "frisbee",
-    "skis",          "snowboard",    "sports ball",
-    "kite",          "baseball bat", "baseball glove",
-    "skateboard",    "surfboard",    "tennis racket",
-    "bottle",        "wine glass",   "cup",
-    "fork",          "knife",        "spoon",
-    "bowl",          "banana",       "apple",
-    "sandwich",      "orange",       "broccoli",
-    "carrot",        "hot dog",      "pizza",
-    "donut",         "cake",         "chair",
-    "couch",         "potted plant", "bed",
-    "dining table",  "toilet",       "tv",
-    "laptop",        "mouse",        "remote",
-    "keyboard",      "cell phone",   "microwave",
-    "oven",          "toaster",      "sink",
-    "refrigerator",  "book",         "clock",
-    "vase",          "scissors",     "teddy bear",
-    "hair drier",    "toothbrush"};
+    "person",         "bicycle",    "car",           "motorcycle",    "airplane",     "bus",           "train",
+    "truck",          "boat",       "traffic light", "fire hydrant",  "stop sign",    "parking meter", "bench",
+    "bird",           "cat",        "dog",           "horse",         "sheep",        "cow",           "elephant",
+    "bear",           "zebra",      "giraffe",       "backpack",      "umbrella",     "handbag",       "tie",
+    "suitcase",       "frisbee",    "skis",          "snowboard",     "sports ball",  "kite",          "baseball bat",
+    "baseball glove", "skateboard", "surfboard",     "tennis racket", "bottle",       "wine glass",    "cup",
+    "fork",           "knife",      "spoon",         "bowl",          "banana",       "apple",         "sandwich",
+    "orange",         "broccoli",   "carrot",        "hot dog",       "pizza",        "donut",         "cake",
+    "chair",          "couch",      "potted plant",  "bed",           "dining table", "toilet",        "tv",
+    "laptop",         "mouse",      "remote",        "keyboard",      "cell phone",   "microwave",     "oven",
+    "toaster",        "sink",       "refrigerator",  "book",          "clock",        "vase",          "scissors",
+    "teddy bear",     "hair drier", "toothbrush"};
 
 struct DetectionCandidate {
   int class_id;
@@ -51,17 +36,16 @@ struct DetectionCandidate {
 
 std::vector<vision_msgs::msg::Detection2D> decode_yolo_output(const InferenceResult &inference,
                                                               const std_msgs::msg::Header &header,
-                                                              double confidence_threshold,
-                                                              double nms_threshold) {
+                                                              double confidence_threshold, double nms_threshold) {
   if (inference.outputs.size() != 1) {
     throw std::runtime_error("YOLO decoder expects exactly one output tensor");
   }
   const auto &output = inference.outputs.front();
-  constexpr int64_t feature_count = 4 + static_cast<int64_t>(kCocoClassNames.size());
   if (output.shape.size() != 3 || output.shape[0] != 1) {
     throw std::runtime_error("Expected YOLO output shape [1, 84, N] or [1, N, 84]");
   }
 
+  constexpr int64_t feature_count = 4 + static_cast<int64_t>(kCocoClassNames.size());
   const bool channels_first = output.shape[1] == feature_count;
   const bool channels_last = output.shape[2] == feature_count;
   if (!channels_first && !channels_last) {
@@ -69,25 +53,28 @@ std::vector<vision_msgs::msg::Detection2D> decode_yolo_output(const InferenceRes
   }
   const int64_t candidate_count = channels_first ? output.shape[2] : output.shape[1];
   const auto expected_value_count = static_cast<size_t>(output.shape[1] * output.shape[2]);
-  if (candidate_count <= 0 || output.values.size() != expected_value_count ||
-      inference.scale <= 0.0F || inference.original_width <= 0 || inference.original_height <= 0) {
+  if (candidate_count <= 0 || output.values.size() != expected_value_count || inference.scale <= 0.0F ||
+      inference.original_width <= 0 || inference.original_height <= 0) {
     throw std::runtime_error("YOLO output tensor or letterbox metadata is invalid");
   }
 
-  const auto value_at = [&output, channels_first, candidate_count](int64_t feature,
-                                                                   int64_t candidate) {
+  // TODO: ORT has no convenience multi-dim accessor sugar; tensors are flat arrays
+  // TODO: Use Eigen::Tensor instead of OutputTensor: Eigen::Tensor provides multi-dim indexing
+  const auto value_at = [&output, channels_first, candidate_count](int64_t feature, int64_t candidate) {
     const size_t index = channels_first ? static_cast<size_t>(feature * candidate_count + candidate)
                                         : static_cast<size_t>(candidate * 84 + feature);
     return output.values[index];
   };
 
   // TODO: understand this!
+  // We're pulling out data from inference.outputs std::vector<OutputTensor> using custom indexing accessor value_at
   std::vector<DetectionCandidate> candidates;
   for (int64_t candidate = 0; candidate < candidate_count; ++candidate) {
+
+    // Find the highest confidence class_id (mostly likely object class)
     int class_id = 0;
     float score = value_at(4, candidate);
-    for (int class_index = 1; class_index < static_cast<int>(kCocoClassNames.size());
-         ++class_index) {
+    for (int class_index = 1; class_index < static_cast<int>(kCocoClassNames.size()); ++class_index) {
       const float class_score = value_at(4 + class_index, candidate);
       if (class_score > score) {
         score = class_score;
@@ -98,23 +85,24 @@ std::vector<vision_msgs::msg::Detection2D> decode_yolo_output(const InferenceRes
       continue;
     }
 
+    // Convert BB coordinates from (x,y,w,h) -> (x0,y0,x1,y1)
     const double center_x = value_at(0, candidate);
     const double center_y = value_at(1, candidate);
     const double width = value_at(2, candidate);
     const double height = value_at(3, candidate);
-    if (!std::isfinite(center_x) || !std::isfinite(center_y) || !std::isfinite(width) ||
-        !std::isfinite(height) || width <= 0.0 || height <= 0.0) {
+    if (!std::isfinite(center_x) || !std::isfinite(center_y) || !std::isfinite(width) || !std::isfinite(height) ||
+        width <= 0.0 || height <= 0.0) {
       continue;
     }
-
-    const double x0 = std::clamp((center_x - width * 0.5 - inference.pad_left) / inference.scale,
-                                 0.0, static_cast<double>(inference.original_width));
-    const double y0 = std::clamp((center_y - height * 0.5 - inference.pad_top) / inference.scale,
-                                 0.0, static_cast<double>(inference.original_height));
-    const double x1 = std::clamp((center_x + width * 0.5 - inference.pad_left) / inference.scale,
-                                 0.0, static_cast<double>(inference.original_width));
-    const double y1 = std::clamp((center_y + height * 0.5 - inference.pad_top) / inference.scale,
-                                 0.0, static_cast<double>(inference.original_height));
+    // Top-left (x0, y0); bottom-right (x1, y1)
+    const double x0 = std::clamp((center_x - width * 0.5 - inference.pad_left) / inference.scale, 0.0,
+                                 static_cast<double>(inference.original_width));
+    const double y0 = std::clamp((center_y - height * 0.5 - inference.pad_top) / inference.scale, 0.0,
+                                 static_cast<double>(inference.original_height));
+    const double x1 = std::clamp((center_x + width * 0.5 - inference.pad_left) / inference.scale, 0.0,
+                                 static_cast<double>(inference.original_width));
+    const double y1 = std::clamp((center_y + height * 0.5 - inference.pad_top) / inference.scale, 0.0,
+                                 static_cast<double>(inference.original_height));
     if (x1 <= x0 || y1 <= y0) {
       continue;
     }
@@ -122,7 +110,9 @@ std::vector<vision_msgs::msg::Detection2D> decode_yolo_output(const InferenceRes
     candidates.push_back({class_id, score, cv::Rect2d(x0, y0, x1 - x0, y1 - y0)});
   }
 
+  std::vector<vision_msgs::msg::Detection2D> detections;
   // For each COCO object class_id...
+  // TODO: potentially restrict to only car and person (peds)
   for (int class_id = 0; class_id < static_cast<int>(kCocoClassNames.size()); ++class_id) {
 
     std::vector<cv::Rect2d> boxes;
@@ -139,11 +129,10 @@ std::vector<vision_msgs::msg::Detection2D> decode_yolo_output(const InferenceRes
     // Non-Maximum Suppression: filter out BBs that have
     // the IoU (w/ highest confidence box) < nms_threshold
     std::vector<int> retained_indices;
-    cv::dnn::NMSBoxes(boxes, scores, static_cast<float>(confidence_threshold),
-                      static_cast<float>(nms_threshold), retained_indices);
+    cv::dnn::NMSBoxes(boxes, scores, static_cast<float>(confidence_threshold), static_cast<float>(nms_threshold),
+                      retained_indices);
 
     // Stuff detections into a std::vector
-    std::vector<vision_msgs::msg::Detection2D> detections;
     for (const int retained_index : retained_indices) {
       const auto &candidate = candidates[candidate_indices.at(static_cast<size_t>(retained_index))];
 
@@ -187,8 +176,7 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
 
   confidence_threshold_ = get_parameter("confidence_threshold").as_double();
   nms_threshold_ = get_parameter("nms_threshold").as_double();
-  if (confidence_threshold_ < 0.0 || confidence_threshold_ > 1.0 || nms_threshold_ < 0.0 ||
-      nms_threshold_ > 1.0) {
+  if (confidence_threshold_ < 0.0 || confidence_threshold_ > 1.0 || nms_threshold_ < 0.0 || nms_threshold_ > 1.0) {
     throw std::invalid_argument("confidence_threshold and nms_threshold must be in [0, 1]");
   }
 
@@ -203,8 +191,7 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
   try {
     model_ = std::make_shared<OnnxModel>(model_path);
   } catch (const std::exception &ex) {
-    RCLCPP_ERROR(get_logger(), "Failed to initialize the ONNX model from '%s': %s",
-                 model_path.c_str(), ex.what());
+    RCLCPP_ERROR(get_logger(), "Failed to initialize the ONNX model from '%s': %s", model_path.c_str(), ex.what());
     throw;
   }
 
@@ -218,12 +205,10 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
   const auto detection_topic = get_parameter("detection_topic").as_string();
   detections_pub_ = create_publisher<vision_msgs::msg::Detection2DArray>(detection_topic, 10);
 
-  RCLCPP_INFO(get_logger(), "YOLO detector component initialized with model '%s'.",
-              model_path.c_str());
+  RCLCPP_INFO(get_logger(), "YOLO detector component initialized with model '%s'.", model_path.c_str());
 }
 
-void YoloDetectorComponent::imageCallback(
-    const sensor_msgs::msg::CompressedImage::ConstSharedPtr msg) {
+void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImage::ConstSharedPtr msg) {
   if (!model_) {
     RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "Detector model is not loaded.");
     return;
@@ -236,8 +221,7 @@ void YoloDetectorComponent::imageCallback(
 
     vision_msgs::msg::Detection2DArray detections;
     detections.header = msg->header;
-    detections.detections =
-        decode_yolo_output(inference, msg->header, confidence_threshold_, nms_threshold_);
+    detections.detections = decode_yolo_output(inference, msg->header, confidence_threshold_, nms_threshold_);
     RCLCPP_DEBUG(get_logger(), "Decoded %zu detections", detections.detections.size());
 
     detections_pub_->publish(detections);

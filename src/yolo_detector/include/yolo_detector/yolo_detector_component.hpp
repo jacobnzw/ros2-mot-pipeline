@@ -5,7 +5,6 @@
 #include <vision_msgs/msg/detection2_d_array.hpp>
 
 #include <memory>
-#include <string>
 
 #include "yolo_detector/onnx_model.hpp"
 

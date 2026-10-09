@@ -103,8 +103,7 @@ InferenceResult OnnxModel::infer(const cv::Mat &bgr_image) {
   const int width = input_shape[3] > 0 ? static_cast<int>(input_shape[3]) : 640;
   input_shape = {1, 3, height, width};
 
-  const float scale = std::min(static_cast<float>(width) / bgr_image.cols,
-                               static_cast<float>(height) / bgr_image.rows);
+  const float scale = std::min(static_cast<float>(width) / bgr_image.cols, static_cast<float>(height) / bgr_image.rows);
   const int resized_width = static_cast<int>(std::round(bgr_image.cols * scale));
   const int resized_height = static_cast<int>(std::round(bgr_image.rows * scale));
 
@@ -141,9 +140,8 @@ InferenceResult OnnxModel::infer(const cv::Mat &bgr_image) {
   // Wrap caller-owned data as a float tensor; it does not copy
   // or take ownership of the vector's storage. The shape describes those
   // floats as [batch, channels, height, width] (NCHW).
-  auto input_tensor =
-      Ort::Value::CreateTensor<float>(memory_info, input_blob.ptr<float>(), input_blob.total(),
-                                      input_shape.data(), input_shape.size());
+  auto input_tensor = Ort::Value::CreateTensor<float>(memory_info, input_blob.ptr<float>(), input_blob.total(),
+                                                      input_shape.data(), input_shape.size());
 
   // Run() accepts arrays of input/output names and tensors. The session matches
   // each name to the corresponding graph input or output and executes the
@@ -156,8 +154,8 @@ InferenceResult OnnxModel::infer(const cv::Mat &bgr_image) {
 
   // RUN INFERENCE
   const char *input_name = input_name_.c_str();
-  auto outputs = session_.Run(Ort::RunOptions{nullptr}, &input_name, &input_tensor, 1,
-                              output_name_pointers.data(), output_name_pointers.size());
+  auto outputs = session_.Run(Ort::RunOptions{nullptr}, &input_name, &input_tensor, 1, output_name_pointers.data(),
+                              output_name_pointers.size());
 
   InferenceResult result;
   result.scale = scale;
@@ -179,6 +177,8 @@ InferenceResult OnnxModel::infer(const cv::Mat &bgr_image) {
     tensor.shape = output_info.GetShape();
     const size_t value_count = output_info.GetElementCount();
     const float *values = output.GetTensorData<float>();
+    // TODO: avoid copy by result.outputs.push_back(std::move(output))
+    // TODO: have result.outputs[i] thin wrap the Ort::Value data in Eigen::TensorMap and expose multi-dim access
     tensor.values.assign(values, values + value_count);
     result.outputs.push_back(std::move(tensor));
   }
