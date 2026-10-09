@@ -38,7 +38,6 @@ x_normalized = (x / 255.0 - 0.5) * 2.0
 The small accuracy gain from letterboxing is usually negligible for most applications, but it's the standard in object detection pipelines (YOLO, SSD, etc.) because it avoids the geometric distortion that can shift bounding box predictions.
 
 
-
 ## Object types
 | ID | Type |
 |----|------|
@@ -216,4 +215,18 @@ PyTorch model
     ├──► ONNX Runtime (CPU / AMD / ARM / fallback)
     │
     └──► trtexec / TensorRT Builder → .engine (NVIDIA GPU, max perf)   
+```
+
+## ROS Workflows
+
+### Visualize 2D Bounding Box Annnotations in Foxglove
+
+```shell
+# Install foxglove bridge
+sudo apt install ros-$ROS_DISTRO-foxglove-bridge
+
+# Launch in separate terminal. Starts: mcap replay, detector, observer, foxglove_bridge
+ros2 launch launch/detector_foxglove_test.launch.py
+
+# Start Foxglove -> "Open Connection" -> "Open"
 ```

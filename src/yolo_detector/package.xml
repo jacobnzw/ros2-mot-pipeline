@@ -13,6 +13,7 @@
   <depend>rclcpp_components</depend>
   <depend>sensor_msgs</depend>
   <depend>vision_msgs</depend>
+  <depend>foxglove_msgs</depend>
   <depend>cv_bridge</depend>
 
   <depend>libfmt-dev</depend>
