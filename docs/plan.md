@@ -11,7 +11,9 @@
 
 ## Phase 1: Concept Validation
 
-> “A minimal YOLOv8-N/YOLO11-N + ByteTrack pipeline can be instrumented as three clean ROS2 nodes with correct sensor-time stamp propagation and bounded queues, delivering measurable end-to-end latency, tracking quality, and resource numbers on a PC that will decide whether a later Jetson deployment is justified.”
+> “A minimal YOLOv8-N/YOLO11-N + ByteTrack pipeline can be instrumented as three clean ROS2 nodes with correct
+> sensor-time stamp propagation and bounded queues, delivering measurable end-to-end latency, tracking quality, and
+> resource numbers on a PC that will decide whether a later Jetson deployment is justified.”
 
 | Category | Details |
 |---|---|
@@ -52,7 +54,7 @@ Results
 - [x] Detector and tracker chosen.
 - [x] Datasets selected and partially downloaded.
 - [x] Architecture diagram drafted.
-- [x] Establish HW baseline: 
+- [x] Establish HW baseline:
   - [x] Run YOLO detector on 200 frames
   - [x] Record median/p95 latency + peak memory on this machine.
 - [x] Environment reproducible
@@ -93,9 +95,9 @@ A valid result is a clean offline Python pipeline
 
 #### Results to achieve
 
-- [ ] YOLO ONNX export for PC
-- [ ] C++ ROS2 components with clear interfaces
-  - [ ] Preprocessing + YOLO Detector component
+- [x] YOLO ONNX export for PC
+- [x] C++ ROS2 components with clear interfaces
+  - [x] Preprocessing + YOLO Detector component
   - [ ] ByteTrack Tracker component
 - [ ] Metrics & Diagnostics Node
   - [ ] Per-stage latency logging (receive → inference start → publish).
@@ -131,9 +133,9 @@ A valid result is a clean offline Python pipeline
 Rent Jetson at [cloudjetson.com](cloudjetson.com) (~1 USD / hr).
 
 
-> Proceed to Jetson only if:
-> - The offline PyTorch pipeline sustains roughly >15–20 FPS on your current hardware with usable tracking quality, and
-> - The ROS2 nodes demonstrate correct timestamp propagation and acceptable queue behaviour.
+> Proceed to Jetson only if: - The offline PyTorch pipeline sustains roughly >15–20 FPS on your current hardware with
+> usable tracking quality, and - The ROS2 nodes demonstrate correct timestamp propagation and acceptable queue
+> behaviour.
 
 
 - [ ] Model exported to ONNX and numerically + visually validated against PyTorch.
