@@ -26,6 +26,7 @@ def generate_launch_description():
                 name="detector",
                 parameters=[
                     {
+                        "use_sim_time": True,
                         "model_path": "models/yolo/yolo11n.onnx",
                         "image_topic": "/camera/image_raw/compressed",
                         "detection_topic": "/detections",

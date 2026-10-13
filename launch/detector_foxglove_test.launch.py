@@ -18,7 +18,7 @@ def generate_launch_description():
         name="tracker_container",
         namespace="",
         package="rclcpp_components",
-        executable="component_container",
+        executable="component_container",  # multi-threaded: component_container_mt
         composable_node_descriptions=[
             ComposableNode(
                 package="yolo_detector",
@@ -26,11 +26,13 @@ def generate_launch_description():
                 name="detector",
                 parameters=[
                     {
+                        "use_sim_time": True,
                         "model_path": "models/yolo/yolo11n.onnx",
                         "image_topic": "/camera/image_raw/compressed",
                         "detection_topic": "/detections",
                     }
                 ],
+                extra_arguments=[{"use_intra_process_comms": True}],
             ),
             # Converts detections from detection2DArray to ImageMarkerArray that Foxglove supports
             ComposableNode(
@@ -39,16 +41,24 @@ def generate_launch_description():
                 name="detector_observer",
                 parameters=[
                     {
+                        "use_sim_time": True,
                         "detections_topic": "/detections",
                         "foxglove_topic": "/detection_annotations",
                     }
                 ],
+                extra_arguments=[{"use_intra_process_comms": True}],
             ),
         ],
     )
 
     foxglove_bridge = ExecuteProcess(
-        cmd=["ros2", "launch", "foxglove_bridge", "foxglove_bridge_launch.xml"],
+        cmd=[
+            "ros2",
+            "launch",
+            "foxglove_bridge",
+            "foxglove_bridge_launch.xml",
+            "topic_whitelist:=['/camera/image_raw/compressed', '/detection_annotations']",
+        ],
         name="foxglove_bridge",
         output="screen",
     )
