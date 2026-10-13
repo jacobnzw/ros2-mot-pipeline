@@ -1,4 +1,5 @@
 
+#include <rclcpp/qos.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include "yolo_detector/yolo_detector_observer.hpp"
@@ -33,11 +34,13 @@ YoloDetectorObserver::YoloDetectorObserver(const rclcpp::NodeOptions &options)
   const auto detections_topic = get_parameter("detections_topic").as_string();
   detections_sub_ = create_subscription<vision_msgs::msg::Detection2DArray>(
       detections_topic, rclcpp::SensorDataQoS(),
-      std::bind(&YoloDetectorObserver::foxgloveConversionCallback, this, std::placeholders::_1));
+      [this](const vision_msgs::msg::Detection2DArray::ConstSharedPtr msg) { this->foxgloveConversionCallback(msg); });
 
   // Create publisher for the detection_topic
+  // TODO: Tune QoS: declare_parameter for QoS --> no rebuilds --> faster iterations via launch file!
   const auto annotation_topic = get_parameter("foxglove_topic").as_string();
-  annotations_pub_ = create_publisher<foxglove_msgs::msg::ImageAnnotations>(annotation_topic, 10);
+  const auto qos_pub = rclcpp::SensorDataQoS().keep_last(5);
+  annotations_pub_ = create_publisher<foxglove_msgs::msg::ImageAnnotations>(annotation_topic, qos_pub);
 }
 
 void YoloDetectorObserver::foxgloveConversionCallback(const vision_msgs::msg::Detection2DArray::ConstSharedPtr msg) {

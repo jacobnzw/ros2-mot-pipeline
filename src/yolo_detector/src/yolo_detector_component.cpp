@@ -2,6 +2,7 @@
 
 #include <cv_bridge/cv_bridge.hpp>
 #include <opencv2/dnn/dnn.hpp>
+#include <rclcpp/qos.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 
@@ -16,6 +17,7 @@
 namespace yolo_detector {
 namespace {
 
+// TODO: Reduce: we only care about: person, car; (maybe: train, bus, bicycle, traffic light, motorcycle, stop sign)
 constexpr std::array<const char *, 80> kCocoClassNames{
     "person",         "bicycle",    "car",           "motorcycle",    "airplane",     "bus",           "train",
     "truck",          "boat",       "traffic light", "fire hydrant",  "stop sign",    "parking meter", "bench",
@@ -198,18 +200,18 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
   }
 
   // Create subscription for the image_topic and bind callback
+  // TODO: Tune QoS
   const auto image_topic = get_parameter("image_topic").as_string();
-
-  // TODO: EXPERIMENT w/ queue depth?
-  auto qos = rclcpp::SensorDataQoS();
-  qos.keep_last(1);
-
+  const auto qos_sub = rclcpp::SensorDataQoS().keep_last(1);
   image_sub_ = create_subscription<sensor_msgs::msg::CompressedImage>(
-      image_topic, qos, std::bind(&YoloDetectorComponent::imageCallback, this, std::placeholders::_1));
+      image_topic, qos_sub,
+      [this](const sensor_msgs::msg::CompressedImage::ConstSharedPtr msg) { this->imageCallback(msg); });
 
   // Create publisher for the detection_topic
+  // TODO: Tune QoS
   const auto detection_topic = get_parameter("detection_topic").as_string();
-  detections_pub_ = create_publisher<vision_msgs::msg::Detection2DArray>(detection_topic, 10);
+  const auto qos_pub = rclcpp::SensorDataQoS().keep_last(1);
+  detections_pub_ = create_publisher<vision_msgs::msg::Detection2DArray>(detection_topic, qos_pub);
 
   RCLCPP_INFO(get_logger(), "YOLO detector component initialized with model '%s'.", model_path.c_str());
 }
