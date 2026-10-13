@@ -18,6 +18,9 @@ find_package(OpenCV REQUIRED COMPONENTS core imgcodecs imgproc dnn)
 find_package(fmt REQUIRED)
 
 set(ONNXRUNTIME_ROOT "$ENV{ONNXRUNTIME_ROOT}" CACHE PATH "ONNX Runtime installation prefix")
+
+# Flag to enable CUDA build, default ON
+option(YOLO_ENABLE_CUDA "Use the ONNX Runtime CUDA execution provider" ON)
 find_path(ONNXRUNTIME_INCLUDE_DIR
   NAMES onnxruntime_cxx_api.h
   HINTS
@@ -31,6 +34,21 @@ find_library(ONNXRUNTIME_LIBRARY
   "${ONNXRUNTIME_ROOT}/lib64"
 )
 
+if(YOLO_ENABLE_CUDA)
+  find_library(ONNXRUNTIME_CUDA_PROVIDER_LIBRARY
+    NAMES onnxruntime_providers_cuda
+    HINTS
+    "${ONNXRUNTIME_ROOT}/lib"
+    "${ONNXRUNTIME_ROOT}/lib64"
+  )
+  if(NOT ONNXRUNTIME_CUDA_PROVIDER_LIBRARY)
+    message(FATAL_ERROR
+      "YOLO_ENABLE_CUDA is ON, but libonnxruntime_providers_cuda was not found under "
+      "ONNXRUNTIME_ROOT. Install the ONNX Runtime GPU distribution and set ONNXRUNTIME_ROOT to it."
+    )
+  endif()
+endif()
+
 if(NOT ONNXRUNTIME_INCLUDE_DIR OR NOT ONNXRUNTIME_LIBRARY)
   message(FATAL_ERROR
     "ONNX Runtime C++ was not found. Set ONNXRUNTIME_ROOT to its installation prefix. "
@@ -40,6 +58,12 @@ endif()
 
 add_library(yolo_onnx src/onnx_model.cpp)
 set_target_properties(yolo_onnx PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(YOLO_ENABLE_CUDA)
+  target_compile_definitions(yolo_onnx PRIVATE YOLO_ENABLE_CUDA=1)
+  message(STATUS "ONNX Runtime CUDA execution provider enabled")
+else()
+  message(STATUS "ONNX Runtime CUDA execution provider disabled (CPU execution)")
+endif()
 target_include_directories(yolo_onnx
   PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"

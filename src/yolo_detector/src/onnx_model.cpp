@@ -19,6 +19,10 @@ namespace {
 Ort::SessionOptions make_session_options() {
   Ort::SessionOptions options;
   options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+#ifdef YOLO_ENABLE_CUDA // TODO: understand how these symbols work
+  Ort::CUDAProviderOptions cuda_options;
+  options.AppendExecutionProvider_CUDA_V2(*cuda_options);
+#endif
   return options;
 }
 

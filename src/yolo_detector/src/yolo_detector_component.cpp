@@ -7,7 +7,9 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <stdexcept>
 #include <utility>
 
@@ -197,9 +199,13 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
 
   // Create subscription for the image_topic and bind callback
   const auto image_topic = get_parameter("image_topic").as_string();
+
+  // TODO: EXPERIMENT w/ queue depth?
+  auto qos = rclcpp::SensorDataQoS();
+  qos.keep_last(1);
+
   image_sub_ = create_subscription<sensor_msgs::msg::CompressedImage>(
-      image_topic, rclcpp::SensorDataQoS(),
-      std::bind(&YoloDetectorComponent::imageCallback, this, std::placeholders::_1));
+      image_topic, qos, std::bind(&YoloDetectorComponent::imageCallback, this, std::placeholders::_1));
 
   // Create publisher for the detection_topic
   const auto detection_topic = get_parameter("detection_topic").as_string();
@@ -209,6 +215,24 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
 }
 
 void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImage::ConstSharedPtr msg) {
+
+  // Callback measurements
+  const auto callback_start = std::chrono::steady_clock::now();
+  const auto image_stamp_ns = rclcpp::Time(msg->header.stamp).nanoseconds();
+  static thread_local bool has_previous_image = false;
+  static thread_local std::chrono::steady_clock::time_point previous_callback_start;
+  static thread_local int64_t previous_image_stamp_ns = 0;
+
+  const double callback_interval_ms =
+      has_previous_image ? std::chrono::duration<double, std::milli>(callback_start - previous_callback_start).count()
+                         : 0.0;
+  const double image_stamp_interval_ms =
+      has_previous_image ? static_cast<double>(image_stamp_ns - previous_image_stamp_ns) / 1.0e6 : 0.0;
+  const bool had_previous_image = has_previous_image;
+  previous_callback_start = callback_start;
+  previous_image_stamp_ns = image_stamp_ns;
+  has_previous_image = true;
+
   if (!model_) {
     RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "Detector model is not loaded.");
     return;
@@ -217,14 +241,37 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
   try {
     // Model inference: run the incomming image through the YOLO detector
     const auto cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+    const auto inference_start = std::chrono::steady_clock::now();
     const auto inference = model_->infer(cv_ptr->image);
+    const auto inference_end = std::chrono::steady_clock::now();
 
+    // Decode YOLO detection
+    // TODO: Pass as ref to be filled; since header is already being passed anyway
     vision_msgs::msg::Detection2DArray detections;
     detections.header = msg->header;
     detections.detections = decode_yolo_output(inference, msg->header, confidence_threshold_, nms_threshold_);
+
     RCLCPP_DEBUG(get_logger(), "Decoded %zu detections", detections.detections.size());
 
     detections_pub_->publish(detections);
+    const auto callback_end = std::chrono::steady_clock::now();
+    const auto image_age = get_clock()->now() - rclcpp::Time(msg->header.stamp);
+
+    // TODO: eventually remove; or hide / abstract suitably
+    if (had_previous_image) {
+      RCLCPP_INFO(get_logger(),
+                  "callback_interval=%.1f ms image_stamp_interval=%.1f ms "
+                  "inference=%.1f ms callback=%.1f ms image_age=%.1f ms",
+                  callback_interval_ms, image_stamp_interval_ms,
+                  std::chrono::duration<double, std::milli>(inference_end - inference_start).count(),
+                  std::chrono::duration<double, std::milli>(callback_end - callback_start).count(),
+                  image_age.seconds() * 1000.0);
+    } else {
+      RCLCPP_INFO(get_logger(), "inference=%.1f ms callback=%.1f ms image_age=%.1f ms",
+                  std::chrono::duration<double, std::milli>(inference_end - inference_start).count(),
+                  std::chrono::duration<double, std::milli>(callback_end - callback_start).count(),
+                  image_age.seconds() * 1000.0);
+    }
 
   } catch (const std::exception &ex) {
     RCLCPP_ERROR(get_logger(), "Inference failed: %s", ex.what());
