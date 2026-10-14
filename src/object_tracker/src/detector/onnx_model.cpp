@@ -1,4 +1,4 @@
-#include "yolo_detector/onnx_model.hpp"
+#include "object_tracker/detector/onnx_model.hpp"
 
 #include <fmt/ranges.h>
 #include <opencv2/dnn/dnn.hpp>
@@ -8,7 +8,7 @@
 #include <cmath>
 #include <stdexcept>
 
-namespace yolo_detector {
+namespace object_tracker {
 namespace {
 
 /**
@@ -189,4 +189,4 @@ InferenceResult OnnxModel::infer(const cv::Mat &bgr_image) {
   return result;
 }
 
-} // namespace yolo_detector
+} // namespace object_tracker

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(yolo_detector LANGUAGES CXX)
+project(object_tracker LANGUAGES CXX)
 
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
@@ -56,7 +56,7 @@ if(NOT ONNXRUNTIME_INCLUDE_DIR OR NOT ONNXRUNTIME_LIBRARY)
   )
 endif()
 
-add_library(yolo_onnx src/onnx_model.cpp)
+add_library(yolo_onnx src/detector/onnx_model.cpp)
 set_target_properties(yolo_onnx PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(YOLO_ENABLE_CUDA)
   target_compile_definitions(yolo_onnx PRIVATE YOLO_ENABLE_CUDA=1)
@@ -73,10 +73,10 @@ target_include_directories(yolo_onnx
 )
 target_link_libraries(yolo_onnx PUBLIC "${ONNXRUNTIME_LIBRARY}" ${OpenCV_LIBS})
 
-add_executable(onnx_probe src/onnx_probe.cpp)
+add_executable(onnx_probe src/detector/onnx_probe.cpp)
 target_link_libraries(onnx_probe PRIVATE yolo_onnx fmt::fmt)
 
-add_library(yolo_detector_component SHARED src/yolo_detector_component.cpp)
+add_library(yolo_detector_component SHARED src/detector/yolo_detector_component.cpp)
 target_include_directories(yolo_detector_component
   PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
@@ -93,10 +93,10 @@ ament_target_dependencies(yolo_detector_component
   vision_msgs
   cv_bridge
 )
-rclcpp_components_register_nodes(yolo_detector_component "yolo_detector::YoloDetectorComponent")
+rclcpp_components_register_nodes(yolo_detector_component "object_tracker::YoloDetectorComponent")
 
 
-add_library(yolo_detector_observer SHARED src/yolo_detector_observer.cpp)
+add_library(yolo_detector_observer SHARED src/detector/yolo_detector_observer.cpp)
 target_include_directories(yolo_detector_observer
   PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
@@ -110,7 +110,7 @@ ament_target_dependencies(yolo_detector_observer
   vision_msgs
   foxglove_msgs
 )
-rclcpp_components_register_nodes(yolo_detector_observer "yolo_detector::YoloDetectorObserver")
+rclcpp_components_register_nodes(yolo_detector_observer "object_tracker::YoloDetectorObserver")
 
 
 

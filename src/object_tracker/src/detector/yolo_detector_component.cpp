@@ -1,4 +1,4 @@
-#include "yolo_detector/yolo_detector_component.hpp"
+#include "object_tracker/detector/yolo_detector_component.hpp"
 
 #include <cv_bridge/cv_bridge.hpp>
 #include <opencv2/dnn/dnn.hpp>
@@ -14,7 +14,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace yolo_detector {
+namespace object_tracker {
 namespace {
 
 // TODO: Reduce: we only care about: person, car; (maybe: train, bus, bicycle, traffic light, motorcycle, stop sign)
@@ -280,6 +280,6 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
   }
 }
 
-} // namespace yolo_detector
+} // namespace object_tracker
 
-RCLCPP_COMPONENTS_REGISTER_NODE(yolo_detector::YoloDetectorComponent)
+RCLCPP_COMPONENTS_REGISTER_NODE(object_tracker::YoloDetectorComponent)

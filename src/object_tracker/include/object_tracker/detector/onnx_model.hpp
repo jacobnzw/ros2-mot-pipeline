@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace yolo_detector {
+namespace object_tracker {
 struct OutputTensor {
   std::vector<int64_t> shape;
   std::vector<float> values;
@@ -55,4 +55,4 @@ private:
   std::vector<std::string> output_names_;
 };
 
-} // namespace yolo_detector
+} // namespace object_tracker

@@ -6,9 +6,9 @@
 
 #include <memory>
 
-#include "yolo_detector/onnx_model.hpp"
+#include "object_tracker/detector/onnx_model.hpp"
 
-namespace yolo_detector {
+namespace object_tracker {
 
 class YoloDetectorComponent : public rclcpp::Node {
 public:
@@ -24,4 +24,4 @@ private:
   rclcpp::Publisher<vision_msgs::msg::Detection2DArray>::SharedPtr detections_pub_;
 };
 
-} // namespace yolo_detector
+} // namespace object_tracker

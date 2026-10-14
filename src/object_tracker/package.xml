@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>yolo_detector</name>
+  <name>object_tracker</name>
   <version>0.1.0</version>
-  <description>ONNX Runtime inference support for a future YOLO ROS 2 detector component.</description>
+  <description>Object tracking in image pixel space.</description>
   <maintainer email="jacobnzw@gmail.com">Jakub Prüher</maintainer>
   <license>TODO</license>
 

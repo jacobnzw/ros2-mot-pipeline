@@ -1,4 +1,4 @@
-#include "yolo_detector/onnx_model.hpp"
+#include "object_tracker/detector/onnx_model.hpp"
 
 #include <fmt/ranges.h>
 #include <opencv2/imgcodecs.hpp>
@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
 
   try {
     // Constructing OnnxModel creates an ORT session and loads the graph once.
-    yolo_detector::OnnxModel model(argv[1]);
+    object_tracker::OnnxModel model(argv[1]);
     std::cout << "Loaded model: " << argv[1] << std::endl;
 
     if (argc == 2) {
