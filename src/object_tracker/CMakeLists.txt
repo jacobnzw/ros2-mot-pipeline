@@ -16,6 +16,7 @@ find_package(foxglove_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(OpenCV REQUIRED COMPONENTS core imgcodecs imgproc dnn)
 find_package(fmt REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 set(ONNXRUNTIME_ROOT "$ENV{ONNXRUNTIME_ROOT}" CACHE PATH "ONNX Runtime installation prefix")
 
@@ -121,4 +122,5 @@ install(TARGETS yolo_onnx onnx_probe yolo_detector_component yolo_detector_obser
 )
 install(DIRECTORY include/ DESTINATION include)
 
+ament_export_dependencies(Eigen3)
 ament_package()

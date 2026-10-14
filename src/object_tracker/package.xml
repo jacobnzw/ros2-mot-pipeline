@@ -15,6 +15,7 @@
   <depend>vision_msgs</depend>
   <depend>foxglove_msgs</depend>
   <depend>cv_bridge</depend>
+  <depend>eigen</depend>
 
   <depend>libfmt-dev</depend>
 
