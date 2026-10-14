@@ -84,12 +84,7 @@ target_include_directories(yolo_detector_component
   "${ONNXRUNTIME_INCLUDE_DIR}"
   ${OpenCV_INCLUDE_DIRS}
 )
-target_link_libraries(yolo_detector_component
-  PUBLIC
-  yolo_onnx
-  PRIVATE
-  fmt::fmt
-)
+target_link_libraries(yolo_detector_component PUBLIC yolo_onnx)
 ament_target_dependencies(yolo_detector_component
   PUBLIC
   rclcpp
@@ -107,12 +102,7 @@ target_include_directories(yolo_detector_observer
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>"
 )
-target_link_libraries(yolo_detector_observer
-  PUBLIC
-  yolo_onnx
-  PRIVATE
-  fmt::fmt
-)
+target_link_libraries(yolo_detector_observer)
 ament_target_dependencies(yolo_detector_observer
   PUBLIC
   rclcpp
