@@ -8,6 +8,12 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <!-- Message generation -->
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+  <depend>std_msgs</depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
+
   <depend>libopencv-dev</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>

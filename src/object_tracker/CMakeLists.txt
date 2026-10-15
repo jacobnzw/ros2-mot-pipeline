@@ -1,16 +1,18 @@
 cmake_minimum_required(VERSION 3.16)
-project(object_tracker LANGUAGES CXX)
+project(object_tracker LANGUAGES C CXX)
 
 if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD 20)
 endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(ament_cmake REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(vision_msgs REQUIRED)
 find_package(foxglove_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
@@ -57,6 +59,17 @@ if(NOT ONNXRUNTIME_INCLUDE_DIR OR NOT ONNXRUNTIME_LIBRARY)
   )
 endif()
 
+
+# ---------- Custom messages ----------
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/TrackedObject.msg"
+  "msg/TrackedObjectArray.msg"
+  DEPENDENCIES std_msgs
+)
+# Make the generated types visible to the rest of the package
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+# ---------- YOLO Detector ----------
 add_library(yolo_onnx src/detector/onnx_model.cpp)
 set_target_properties(yolo_onnx PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(YOLO_ENABLE_CUDA)
@@ -96,7 +109,7 @@ ament_target_dependencies(yolo_detector_component
 )
 rclcpp_components_register_nodes(yolo_detector_component "object_tracker::YoloDetectorComponent")
 
-
+# ---------- Observer for YOLO Detector  ----------
 add_library(yolo_detector_observer SHARED src/detector/yolo_detector_observer.cpp)
 target_include_directories(yolo_detector_observer
   PUBLIC
@@ -113,9 +126,29 @@ ament_target_dependencies(yolo_detector_observer
 )
 rclcpp_components_register_nodes(yolo_detector_observer "object_tracker::YoloDetectorObserver")
 
+# ---------- ByteTrack Tracker ----------
+add_library(tracker_component SHARED
+  src/tracker/byte_tracker.cpp
+  src/tracker/kalman_filter.cpp
+  src/tracker/linear_assignment.cpp
+  src/tracker/tracker_component.cpp
+)
+target_include_directories(tracker_component
+  PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:include>"
+)
+target_link_libraries(tracker_component PRIVATE "${cpp_typesupport_target}" Eigen3::Eigen)
+ament_target_dependencies(tracker_component
+  PUBLIC
+  rclcpp
+  rclcpp_components
+  std_msgs
+  vision_msgs
+)
+rclcpp_components_register_nodes(tracker_component "object_tracker::TrackerComponent")
 
-
-install(TARGETS yolo_onnx onnx_probe yolo_detector_component yolo_detector_observer
+install(TARGETS yolo_onnx onnx_probe yolo_detector_component yolo_detector_observer tracker_component
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}

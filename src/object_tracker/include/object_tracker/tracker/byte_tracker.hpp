@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <span>
 #include <vector>
 
 #include "object_tracker/tracker/detection.hpp"

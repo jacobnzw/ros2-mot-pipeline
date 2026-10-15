@@ -18,11 +18,11 @@ def generate_launch_description():
         name="tracker_container",
         namespace="",
         package="rclcpp_components",
-        executable="component_container",
+        executable="component_container",  # multi-threaded: component_container_mt
         composable_node_descriptions=[
             ComposableNode(
-                package="yolo_detector",
-                plugin="yolo_detector::YoloDetectorComponent",
+                package="object_tracker",
+                plugin="object_tracker::YoloDetectorComponent",
                 name="detector",
                 parameters=[
                     {
@@ -32,7 +32,29 @@ def generate_launch_description():
                         "detection_topic": "/detections",
                     }
                 ],
-            )
+                extra_arguments=[{"use_intra_process_comms": True}],
+            ),
+            # Detections from detection2DArray used as observations for forming tracks output as TrackedObjectArray
+            ComposableNode(
+                package="object_tracker",
+                plugin="object_tracker::TrackerComponent",
+                name="tracker",
+                parameters=[
+                    {
+                        "use_sim_time": True,
+                        "detections_topic": "/detections",
+                        "tracks_topic": "~/tracks",
+                        "high_threshold": 0.25,  # detections above this take part in the first association
+                        "low_threshold": 0.1,  # (low, high) detections only rescue existing tracks
+                        "new_track_threshold": 0.25,  # minimum score to start a new track
+                        "match_threshold": 0.8,  # max (1 - IoU) cost in the first association
+                        "track_buffer": 10,  # frames a lost track is kept for re-identification
+                        "frame_rate": 10.0,
+                        "fuse_score": True,
+                    }
+                ],
+                extra_arguments=[{"use_intra_process_comms": True}],
+            ),
         ],
     )
 
