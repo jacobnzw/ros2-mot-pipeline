@@ -8,11 +8,9 @@
 
 #include <algorithm>
 #include <array>
-#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <stdexcept>
-#include <utility>
 
 namespace object_tracker {
 namespace {
@@ -149,7 +147,7 @@ std::vector<vision_msgs::msg::Detection2D> decode_yolo_output(const InferenceRes
       detection.bbox.size_y = candidate.box.height;
 
       vision_msgs::msg::ObjectHypothesisWithPose result;
-      result.hypothesis.class_id = kCocoClassNames[class_id];
+      result.hypothesis.class_id = std::to_string(class_id);
       result.hypothesis.score = candidate.score;
 
       detection.results.push_back(std::move(result)); // std::vector<ObjectHypothesisWithPose>

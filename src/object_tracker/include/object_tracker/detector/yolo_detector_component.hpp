@@ -4,8 +4,6 @@
 #include <sensor_msgs/msg/compressed_image.hpp>
 #include <vision_msgs/msg/detection2_d_array.hpp>
 
-#include <memory>
-
 #include "object_tracker/detector/onnx_model.hpp"
 
 namespace object_tracker {
@@ -17,6 +15,7 @@ public:
 private:
   void imageCallback(const sensor_msgs::msg::CompressedImage::ConstSharedPtr msg);
 
+  // TODO: WHY shared_ptr here?
   std::shared_ptr<OnnxModel> model_;
   double confidence_threshold_{0.25};
   double nms_threshold_{0.45};
