@@ -2,14 +2,14 @@
 #include <rclcpp/qos.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-#include "yolo_detector/yolo_detector_observer.hpp"
+#include "object_tracker/detector/yolo_detector_observer.hpp"
 #include <rclcpp_components/register_node_macro.hpp>
 
 #include <cmath>
 #include <cstddef>
 #include <utility>
 
-namespace yolo_detector {
+namespace object_tracker {
 namespace {
 
 foxglove_msgs::msg::Point2 make_bbox_point(double center_x, double center_y, double offset_x, double offset_y,
@@ -79,6 +79,6 @@ void YoloDetectorObserver::foxgloveConversionCallback(const vision_msgs::msg::De
 
   annotations_pub_->publish(annotations);
 }
-} // namespace yolo_detector
+} // namespace object_tracker
 
-RCLCPP_COMPONENTS_REGISTER_NODE(yolo_detector::YoloDetectorObserver)
+RCLCPP_COMPONENTS_REGISTER_NODE(object_tracker::YoloDetectorObserver)

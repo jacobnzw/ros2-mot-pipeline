@@ -1,12 +1,18 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>yolo_detector</name>
+  <name>object_tracker</name>
   <version>0.1.0</version>
-  <description>ONNX Runtime inference support for a future YOLO ROS 2 detector component.</description>
+  <description>Object tracking in image pixel space.</description>
   <maintainer email="jacobnzw@gmail.com">Jakub Prüher</maintainer>
   <license>TODO</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- Message generation -->
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+  <depend>std_msgs</depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
 
   <depend>libopencv-dev</depend>
   <depend>rclcpp</depend>
@@ -15,6 +21,7 @@
   <depend>vision_msgs</depend>
   <depend>foxglove_msgs</depend>
   <depend>cv_bridge</depend>
+  <depend>eigen</depend>
 
   <depend>libfmt-dev</depend>
 

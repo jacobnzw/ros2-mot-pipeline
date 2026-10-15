@@ -1,6 +1,6 @@
 # ROS 2 C++ Setup
 
-The `src/yolo_detector` package uses `ament_cmake` and `colcon`. OpenCV is provided by Ubuntu/ROS packages. ONNX Runtime
+The `src/object_tracker` package uses `ament_cmake` and `colcon`. OpenCV is provided by Ubuntu/ROS packages. ONNX Runtime
 C++ is installed separately because the Python `onnxruntime` dependency does not provide its C++ headers and libraries.
 
 ## System dependencies
@@ -56,17 +56,8 @@ The GPU SDK must contain `lib/libonnxruntime_providers_cuda.so`; CMake checks fo
 `ONNXRUNTIME_ROOT` pointed at this SDK for both build modes. Do not commit the extracted SDK or cuDNN libraries to the
 repository.
 
-For WSL, put the matching host-driver directory first in the runtime library path; an older distro-installed NVIDIA PTX
-JIT library can conflict with the WSL driver:
-
-```bash
-WSL_NVIDIA_DRIVER_ROOT="$(dirname "$(find /usr/lib/wsl/drivers \
-  -name libnvidia-ptxjitcompiler.so.1 -print -quit)")"
-export LD_LIBRARY_PATH="$WSL_NVIDIA_DRIVER_ROOT:$CUDNN_ROOT/nvidia/cudnn/lib:/usr/local/cuda/lib64:$ONNXRUNTIME_ROOT/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-```
-
-For native Ubuntu rather than WSL, omit `WSL_NVIDIA_DRIVER_ROOT` and use the NVIDIA driver libraries provided by the
-host.
+The project helper script below adds these directories to the runtime path and discovers the WSL host-driver directory
+when running under WSL.
 
 This setup covers the C++ detector runtime. The project Python environment may have its own CUDA dependencies for
 PyTorch; do not remove those when cleaning up old ONNX Runtime libraries.
@@ -77,17 +68,17 @@ when building and running.
 
 ## Build and run
 
-Run these commands from the repository root in a shell with `ONNXRUNTIME_ROOT` and the runtime library path set as
-above. CUDA is enabled by default, so no CUDA CMake flag is needed:
+Run these commands from the repository root in zsh. The helper sources ROS 2, sets the ONNX Runtime/cuDNN paths, adds
+the runtime library directories, and sources the workspace overlay when it exists. CUDA is enabled by default, so no
+CUDA CMake flag is needed:
 
 ```bash
-source /opt/ros/jazzy/setup.zsh
-export ONNXRUNTIME_ROOT="$HOME/opt/onnxruntime-linux-x64-gpu_cuda12-1.30.0"
+source scripts/ros2_env.zsh
 test -f "$ONNXRUNTIME_ROOT/lib/libonnxruntime_providers_cuda.so" || {
   echo "CUDA provider not found under ONNXRUNTIME_ROOT=$ONNXRUNTIME_ROOT" >&2
   exit 1
 }
-colcon build --base-paths src --packages-select yolo_detector --symlink-install \
+colcon build --base-paths src --packages-select object_tracker --symlink-install \
   --cmake-clean-cache \
   --cmake-args \
     "-DPython3_EXECUTABLE=/usr/bin/python3" \
@@ -95,10 +86,10 @@ colcon build --base-paths src --packages-select yolo_detector --symlink-install 
 source install/setup.zsh
 
 # Load the ONNX model and confirm that ONNX Runtime can create a session.
-ros2 run yolo_detector onnx_probe models/yolo/yolo11n.onnx
+ros2 run object_tracker onnx_probe models/yolo/yolo11n.onnx
 
 # Run one image through the model and print output tensor shapes.
-ros2 run yolo_detector onnx_probe \
+ros2 run object_tracker onnx_probe \
   models/yolo/yolo11n.onnx \
   data/kitti/left_color/training/image_02/0019/000000.png
 ```
@@ -106,7 +97,7 @@ ros2 run yolo_detector onnx_probe \
 For CPU-only execution, keep the same CUDA-capable SDK and explicitly disable its CUDA provider:
 
 ```bash
-colcon build --base-paths src --packages-select yolo_detector --symlink-install \
+colcon build --base-paths src --packages-select object_tracker --symlink-install \
   --cmake-clean-cache \
   --cmake-args \
     "-DPython3_EXECUTABLE=/usr/bin/python3" \
@@ -118,23 +109,17 @@ With CUDA enabled, CMake requires the ONNX Runtime CUDA provider and session cre
 NVIDIA libraries are unavailable; it does not silently switch to CPU-only execution. Use `--cmake-clean-cache` when
 switching between GPU and CPU-only builds so CMake reconfigures the provider setting.
 
-The process that runs `ros2 launch` must also have the CUDA, cuDNN, and ONNX Runtime directories in its library search
-path. Shell exports do not carry over to a different terminal or to a VS Code launch session. In WSL, set these in the
-same terminal where you launch the detector:
+In every terminal that launches ROS nodes, source the helper once to set up ROS, the workspace overlay, and CUDA
+libraries. This also works from a new terminal; no separate `CUDNN_ROOT`, `LD_LIBRARY_PATH`, or WSL-driver discovery
+commands are needed:
 
 ```bash
-source /opt/ros/jazzy/setup.zsh
-source install/setup.zsh
-export ONNXRUNTIME_ROOT="$HOME/opt/onnxruntime-linux-x64-gpu_cuda12-1.30.0"
-export CUDNN_ROOT="$HOME/opt/cuda12-cudnn-runtime"
-WSL_NVIDIA_DRIVER_ROOT="$(dirname "$(find /usr/lib/wsl/drivers \
-  -name libnvidia-ptxjitcompiler.so.1 -print -quit)")"
-export LD_LIBRARY_PATH="$WSL_NVIDIA_DRIVER_ROOT:$CUDNN_ROOT/nvidia/cudnn/lib:/usr/local/cuda/lib64:$ONNXRUNTIME_ROOT/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+source scripts/ros2_env.zsh
 ros2 launch launch/detector_foxglove_test.launch.py
 ```
 
-If launching from VS Code or another terminal, configure the same `LD_LIBRARY_PATH` for that launch environment. For a
-system-wide cuDNN installation, use its library directory in place of `$CUDNN_ROOT/nvidia/cudnn/lib`.
+To use a system-wide cuDNN installation, set `CUDNN_LIBRARY_DIR` before sourcing the helper. To override the default
+SDK or toolkit locations, set `ONNXRUNTIME_ROOT` or `CUDA_ROOT` first.
 
 The probe letterboxes the image, converts it to RGB float values in `[0, 1]`, and runs the model. It reports tensor
 shapes but does not decode detections or apply NMS; those details depend on the ONNX export configuration. `build/`,

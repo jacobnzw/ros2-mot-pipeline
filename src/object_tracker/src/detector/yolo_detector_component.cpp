@@ -1,4 +1,4 @@
-#include "yolo_detector/yolo_detector_component.hpp"
+#include "object_tracker/detector/yolo_detector_component.hpp"
 
 #include <cv_bridge/cv_bridge.hpp>
 #include <opencv2/dnn/dnn.hpp>
@@ -8,13 +8,11 @@
 
 #include <algorithm>
 #include <array>
-#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <stdexcept>
-#include <utility>
 
-namespace yolo_detector {
+namespace object_tracker {
 namespace {
 
 // TODO: Reduce: we only care about: person, car; (maybe: train, bus, bicycle, traffic light, motorcycle, stop sign)
@@ -149,7 +147,7 @@ std::vector<vision_msgs::msg::Detection2D> decode_yolo_output(const InferenceRes
       detection.bbox.size_y = candidate.box.height;
 
       vision_msgs::msg::ObjectHypothesisWithPose result;
-      result.hypothesis.class_id = kCocoClassNames[class_id];
+      result.hypothesis.class_id = std::to_string(class_id);
       result.hypothesis.score = candidate.score;
 
       detection.results.push_back(std::move(result)); // std::vector<ObjectHypothesisWithPose>
@@ -280,6 +278,6 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
   }
 }
 
-} // namespace yolo_detector
+} // namespace object_tracker
 
-RCLCPP_COMPONENTS_REGISTER_NODE(yolo_detector::YoloDetectorComponent)
+RCLCPP_COMPONENTS_REGISTER_NODE(object_tracker::YoloDetectorComponent)

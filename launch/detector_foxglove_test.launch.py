@@ -21,8 +21,8 @@ def generate_launch_description():
         executable="component_container",  # multi-threaded: component_container_mt
         composable_node_descriptions=[
             ComposableNode(
-                package="yolo_detector",
-                plugin="yolo_detector::YoloDetectorComponent",
+                package="object_tracker",
+                plugin="object_tracker::YoloDetectorComponent",
                 name="detector",
                 parameters=[
                     {
@@ -36,8 +36,8 @@ def generate_launch_description():
             ),
             # Converts detections from detection2DArray to ImageMarkerArray that Foxglove supports
             ComposableNode(
-                package="yolo_detector",
-                plugin="yolo_detector::YoloDetectorObserver",
+                package="object_tracker",
+                plugin="object_tracker::YoloDetectorObserver",
                 name="detector_observer",
                 parameters=[
                     {

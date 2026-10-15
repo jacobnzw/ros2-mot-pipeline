@@ -4,7 +4,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <vision_msgs/msg/detection2_d_array.hpp>
 
-namespace yolo_detector {
+namespace object_tracker {
 
 class YoloDetectorObserver : public rclcpp::Node {
 public:
@@ -17,4 +17,4 @@ private:
   rclcpp::Publisher<foxglove_msgs::msg::ImageAnnotations>::SharedPtr annotations_pub_;
 };
 
-} // namespace yolo_detector
+} // namespace object_tracker

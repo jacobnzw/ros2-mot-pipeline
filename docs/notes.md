@@ -289,6 +289,7 @@ ros2 launch launch/detector_foxglove_test.launch.py
 - TODO: Understand [QoS](https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Quality-of-Service-Settings.html)
 - TODO: Understand queing pressure: what (causes) is it? alleviation?
 - TODO: Understand executors (single, multi-threaded, isolated) and callback groups
+- TODO: Understand who calls the callbacks? What could cause delays between callback calls?
 
 Callback groups control which callbacks are allowed to run in parallel when the executor is `MultiThreaded`. Callback
 groups only matter when you are using a `MultiThreaded` executor. With the plain `component_container`
