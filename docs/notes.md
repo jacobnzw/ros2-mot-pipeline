@@ -286,15 +286,122 @@ ros2 launch launch/detector_foxglove_test.launch.py
 
 # ROS Middleware
 
+- TODO: Understand how shared_ptr enables inter-process comms.
 - TODO: Understand [QoS](https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Quality-of-Service-Settings.html)
-- TODO: Understand queing pressure: what (causes) is it? alleviation?
-- TODO: Understand executors (single, multi-threaded, isolated) and callback groups
+- TODO: Understand queing pressure: what (causes) is it? alleviation? backpressure causes?
+- TODO: Understand executors (single, multi-threaded, isolated) and callback groups; reentrancy
+- TODO: Understand scheduling, preemption: how it affects the latencies, choice of queue depth etc.
+- TODO: Given a real sensor instead of a bag player, how do the above concerns and mitigation strategies change?
 - TODO: Understand who calls the callbacks? What could cause delays between callback calls?
+- TODO: Understand middleware limits: characterizable using graph theory?
+- TODO: Improve latency of YOLO11n: should be way ~1-3ms, which is way below the current 30ms on RTX3090
 
+## Callback Groups & Executors
 Callback groups control which callbacks are allowed to run in parallel when the executor is `MultiThreaded`. Callback
 groups only matter when you are using a `MultiThreaded` executor. With the plain `component_container`
 (`SingleThreaded`) everything is already serialized.
 
+
+## Ingress Policies
+Which to use depends on your goal:
+- strict delivery (use block),
+- bounded latency with some loss (drop-newest), or
+- low latency / freshest output (latest).
+
+### Block
+Producer is blocked when the ingress buffer is full (backpressure). No frames are dropped, but backlog grows and
+end-to-end latency can grow without bound. In the script they run it with a large ingress-capacity (256) so backlog
+accumulates.
+
+### Drop-newest
+When the buffer is full, newly arriving frames are discarded. Drop-newest bounds latency by keeping the ingress queue at
+a fixed maximum size and refusing (dropping) any newly arriving frames when that fixed-size buffer is full. Because the
+queue length never grows, the maximum queuing delay for any frame is at most the time to process that many frames — so
+latency is bounded at the cost of frame completeness (some frames never get processed).
+
+### Latest
+Keep only the most recent frame(s). Older buffered frames are discarded in favor of the newest. This minimizes latency
+(you always process fresh data) at the cost of skipping intermediate frames. This is often preferred in real-time
+systems where stale frames are useless.
+
+
+### Overload Example: Slow Detector
+> A 30 fps camera feeding a detector that manages only ~25 fps.
+
+```mermaid
+flowchart LR
+  P["producer</br> (sensor)"] -->|frame| Queue -->|frame| R["consumer</br>(detector)"]
+```
+
+The choice of ingress policy doesn’t “speed up” the detector; it controls queuing, frame loss, and backpressure, which
+change the observed end-to-end latency distribution and freshness of outputs. What the ingress policy changes is which
+frames get processed, how many are queued (so how long frames wait before processing), and whether the producer is
+blocked when the consumer is slower.
+
+What the policy does affect:
+
+- Queuing delay: how long a frame waits before the detector starts processing it (this is what you measure as end-to-end
+  latency).
+- Frame selection: which frames actually reach the detector (drop-newest, latest discard some frames).
+- Backpressure: block causes the producer to stall; drop/newest/latest let the producer continue (possibly losing
+  frames).
+- Throughput vs freshness trade-off: block preserves all frames (max completeness), drop-newest bounds latency (loses
+  recent arrivals), latest favors freshest frames (minimizes staleness).
+
+Indirect system effects (rare, secondary):
+
+- In real systems, queueing patterns can slightly change measured processing time because of scheduler behavior, cache
+  locality, power/CPU frequency scaling, or the detector receiving more/less contention. Those are implementation-level
+  effects and are not the policy magically making the algorithm faster.
+- If the detector is adaptive (e.g., it reduces work when backlog is large, or batches frames when many are queued),
+  then the ingress policy can indirectly change per-frame processing time by changing what the detector chooses to do.
+  With a fixed, non-adaptive detector (like the fake backend), that doesn’t happen.
+
+
+#### Does queue depth > 1 for latest policy even matter?
+
+If your detector never batches and you always pop the single newest frame at dequeue time, then a one-slot "latest"
+buffer gives you the same freshness/latency as a larger one. But there are practical reasons teams still choose a
+`depth > 1`. Below are the key points and tradeoffs.
+
+Why `depth = 1` is enough in the ideal model
+
+- If the consumer always processes the freshest frame available and does not batch, keeping any older frames is
+  pointless: they'll be stale by the time they’d be processed and you’ll never use them.
+- With a perfect single-producer/single-consumer handoff (atomic swap or single-slot ring buffer with overwrite),
+  depth=1 minimizes queuing delay and guarantees you always process the freshest sample.
+
+Why people sometimes use `depth > 1` anyway
+
+- Burst tolerance / scheduling jitter: real OS scheduling and brief producer/consumer jitter can create short bursts of
+  arrivals while the consumer is preempted. A tiny extra capacity (2–4) lets you survive those bursts without dropping
+  many frames or doing extra overwrites.
+- Reduced contention / lock-free behavior: some lock-free queue implementations work more naturally or perform better
+  with a small ring buffer rather than a single-slot atomic, especially with multiple producers or when you want to
+  avoid spinning. A small depth can reduce CAS retries.
+- Pipeline smoothing across stages: if downstream stages are partially parallel or have small variability, a bit of
+  buffering can help keep the pipeline fed without producing long tails of staleness.
+- Implementation semantics vary: “latest” can be implemented in different ways (single-slot overwrite, overwrite-oldest
+  in an N-capacity ring, or consumer pops the newest among N). Those semantics affect whether an older slot is ever
+  useful. Faults & temporary stalls: if a consumer crashes or stalls briefly and then recovers, a buffer >1 can help in
+  graceful recovery or diagnostics (you may want to inspect recent frames). Instrumentation / metrics: retaining a short
+  history of recent frames can help tracing and debugging.
+
+When `depth > 1` is useful vs wasteful
+
+- Useful: you need some resilience to producer bursts or scheduling noise, or your implementation/primitives work better
+  with a small ring buffer.
+- Wasteful: you strictly care about absolute freshness, you have a single reliable producer thread, and you can
+  implement a cheap single-slot latest swap — then `depth > 1` mostly wastes memory and keeps stale frames around.
+
+Recommendation
+
+- If your only goal is freshest possible output and you have a simple single-producer/single-consumer design, use
+  `depth = 1` (or a single atomic slot).
+- If you want robustness to jitter and slightly smoother behavior in real OS environments, pick a small `depth` (2–4)
+  and measure.
+- If the detector might later support batching or adaptive behaviors, a larger buffer can enable batching at the cost of
+  staleness — design intentionally for that.
 
 # Links and References
 

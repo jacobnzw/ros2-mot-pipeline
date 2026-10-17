@@ -98,7 +98,7 @@ A valid result is a clean offline Python pipeline
 - [x] YOLO ONNX export for PC
 - [x] C++ ROS2 components with clear interfaces
   - [x] Preprocessing + YOLO Detector component
-  - [ ] ByteTrack Tracker component
+  - [x] ByteTrack Tracker component
 - [ ] Metrics & Diagnostics Node
   - [ ] Per-stage latency logging (receive → inference start → publish).
   - [ ] Basic diagnostics (queue depth, frame drop count).
@@ -113,6 +113,9 @@ A valid result is a clean offline Python pipeline
 - [ ] End-to-end latency (t_track_output – t_image_stamp).
 - [ ] Per-stage latencies (p50/p95/p99).
 - [ ] Queue depth and drop rate under sustained replay.
+  - [ ] [takt-vision's stress test](https://github.com/GBR-RL/takt-vision/blob/main/scripts/overload_experiment.sh) The
+    overload experiment: a 30 fps camera feeding a detector that manages only ~25 fps. Runs the same scenario under each
+    ingress policy and plots end-to-end latency over time.
 - [ ] Topic rates (ros2 topic hz).
 
 
