@@ -247,6 +247,11 @@ PyTorch model
 # ROS Workflows
 
 ## Observability
+Live observability not 
+| Stream | Rate | Content | Consumption | Notes |
+| --- | --- | --- | --- | --- |
+| File (e.g., `*.rrd`) | Full rate (~ 10 Hz) | Scalars; (images, see note) | Offline inspection (e.g. in rerun viewer) | Logging scalars with rerun is negligible even on Jetson. If logging images, reduce rate: conditional logging or fixed low rate. |
+| `/diagnostics` topic | Low (<= 1 Hz) | Scalars (latency aggregates) | Live viewing with `ros2 topic echo` | Live aggregates of latency samples, if requested via node launch param. |
 
 A practical production approach
 - Keep the critical data path bounded and observable. Use sensor-appropriate QoS and bounded queues—often best effort
