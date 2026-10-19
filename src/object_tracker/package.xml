@@ -25,6 +25,10 @@
 
   <depend>libfmt-dev</depend>
 
+  <!-- Required system tools for CMake FetchContent to pull the Rerun SDK -->
+  <build_depend>git</build_depend>
+  <build_depend>libssl-dev</build_depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>
