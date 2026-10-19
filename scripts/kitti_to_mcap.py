@@ -12,15 +12,9 @@ IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg"}
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Write an image folder to a ROS 2 MCAP bag."
-    )
-    parser.add_argument(
-        "image_dir", type=Path, help="Folder containing PNG or JPEG images"
-    )
-    parser.add_argument(
-        "output", type=Path, help="Output rosbag directory (must not exist)"
-    )
+    parser = argparse.ArgumentParser(description="Write an image folder to a ROS 2 MCAP bag.")
+    parser.add_argument("image_dir", type=Path, help="Folder containing PNG or JPEG images")
+    parser.add_argument("output", type=Path, help="Output rosbag directory (must not exist)")
     parser.add_argument("--topic", default="/camera/image_raw/compressed")
     parser.add_argument("--frame-id", default="camera")
     parser.add_argument("--fps", type=float, default=10.0)
@@ -38,11 +32,7 @@ def main() -> None:
         parser.error("--fps must be greater than zero")
 
     # Grab images to process
-    images = sorted(
-        path
-        for path in image_dir.iterdir()
-        if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
-    )
+    images = sorted(path for path in image_dir.iterdir() if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES)
     if not images:
         parser.error(f"No PNG or JPEG images found in {image_dir}")
 
@@ -64,6 +54,7 @@ def main() -> None:
             typestore=typestore,
         )
 
+        # TODO: need proper time stamps
         for index, image_path in enumerate(images):
             timestamp_ns = round(index * NANOSECONDS / args.fps)
             seconds, nanoseconds = divmod(timestamp_ns, NANOSECONDS)

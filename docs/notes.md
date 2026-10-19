@@ -247,7 +247,9 @@ PyTorch model
 # ROS Workflows
 
 ## Observability
-Live observability not 
+
+Live observability not suitable for embedded deployment.
+
 | Stream | Rate | Content | Consumption | Notes |
 | --- | --- | --- | --- | --- |
 | File (e.g., `*.rrd`) | Full rate (~ 10 Hz) | Scalars; (images, see note) | Offline inspection (e.g. in rerun viewer) | Logging scalars with rerun is negligible even on Jetson. If logging images, reduce rate: conditional logging or fixed low rate. |

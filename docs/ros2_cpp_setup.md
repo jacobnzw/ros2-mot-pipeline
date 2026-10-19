@@ -118,6 +118,15 @@ source scripts/ros2_env.zsh
 ros2 launch launch/detector_foxglove_test.launch.py
 ```
 
+The C++ SDK fetched by CMake writes Rerun data, but does not install the standalone Rerun viewer/CLI.
+Install the viewer separately, for example with `uv tool install rerun-sdk` (see the
+[Rerun viewer installation guide](https://rerun.io/docs/getting-started/install-rerun/viewer)).
+After running the detector and tracker, their scalar metrics are written to `object_tracker.rrd` in
+the launch working directory. Open it with `rerun object_tracker.rrd`. The recording includes
+detector inference and callback intervals, estimated cumulative frame drops, ByteTrack association
+latency and active-track count, and image-stamp-to-tracker-output latency. Frame-drop estimates use
+the detector's `expected_frame_rate` parameter and the tracker's `frame_rate` parameter.
+
 To use a system-wide cuDNN installation, set `CUDNN_LIBRARY_DIR` before sourcing the helper. To override the default
 SDK or toolkit locations, set `ONNXRUNTIME_ROOT` or `CUDA_ROOT` first.
 
