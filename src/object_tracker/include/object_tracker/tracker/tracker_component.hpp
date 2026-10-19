@@ -7,6 +7,9 @@
 #include <std_msgs/msg/header.hpp>
 #include <vision_msgs/msg/detection2_d_array.hpp>
 
+#include <cstdint>
+#include <mutex>
+
 namespace object_tracker {
 
 class TrackerComponent : public rclcpp::Node {
@@ -20,6 +23,13 @@ private:
                                   const std_msgs::msg::Header &header) const;
 
   ByteTracker tracker_;
+  rclcpp::Clock::SharedPtr metrics_clock_;
+  double expected_frame_rate_{10.0};
+  std::mutex metrics_mutex_;
+  bool has_previous_detections_{false};
+  int64_t previous_detections_stamp_ns_{0};
+  int64_t previous_callback_start_ns_{0};
+  int64_t frame_drop_count_{0};
 
   rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr detections_sub_;
   rclcpp::Publisher<object_tracker::msg::TrackedObjectArray>::SharedPtr tracks_pub_;

@@ -1,6 +1,7 @@
 #include "object_tracker/detector/yolo_detector_component.hpp"
 
 #include <cv_bridge/cv_bridge.hpp>
+#include <object_tracker/metrics.hpp>
 #include <opencv2/dnn/dnn.hpp>
 #include <rclcpp/qos.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
@@ -175,12 +176,21 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
   declare_parameter("detection_topic", std::string("~/detections"));
   declare_parameter("confidence_threshold", 0.25);
   declare_parameter("nms_threshold", 0.45);
+  declare_parameter("expected_frame_rate", 10.0);
 
   confidence_threshold_ = get_parameter("confidence_threshold").as_double();
   nms_threshold_ = get_parameter("nms_threshold").as_double();
+  expected_frame_rate_ = get_parameter("expected_frame_rate").as_double();
+
   if (confidence_threshold_ < 0.0 || confidence_threshold_ > 1.0 || nms_threshold_ < 0.0 || nms_threshold_ > 1.0) {
     throw std::invalid_argument("confidence_threshold and nms_threshold must be in [0, 1]");
   }
+  if (!std::isfinite(expected_frame_rate_) || expected_frame_rate_ <= 0.0) {
+    throw std::invalid_argument("expected_frame_rate must be finite and greater than zero");
+  }
+
+  metrics_clock_ = metrics::create_clock(*this);
+  metrics::initialize_rerun();
 
   const auto model_path = get_parameter("model_path").as_string();
   if (model_path.empty()) {
@@ -215,23 +225,40 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
 }
 
 void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImage::ConstSharedPtr msg) {
-
-  // Callback measurements
-  const auto callback_start = std::chrono::steady_clock::now();
+  const auto callback_start = metrics_clock_->now();
   const auto image_stamp_ns = rclcpp::Time(msg->header.stamp).nanoseconds();
-  static thread_local bool has_previous_image = false;
-  static thread_local std::chrono::steady_clock::time_point previous_callback_start;
-  static thread_local int64_t previous_image_stamp_ns = 0;
+  double callback_interval_ms = 0.0;
+  double image_stamp_interval_ms = 0.0;
+  int64_t frame_drop_count = 0;
+  bool had_previous_image = false;
 
-  const double callback_interval_ms =
-      has_previous_image ? std::chrono::duration<double, std::milli>(callback_start - previous_callback_start).count()
-                         : 0.0;
-  const double image_stamp_interval_ms =
-      has_previous_image ? static_cast<double>(image_stamp_ns - previous_image_stamp_ns) / 1.0e6 : 0.0;
-  const bool had_previous_image = has_previous_image;
-  previous_callback_start = callback_start;
-  previous_image_stamp_ns = image_stamp_ns;
-  has_previous_image = true;
+  // TODO: CONVOLUTED AF: find better solution if possible;
+  {
+    std::lock_guard lock(metrics_mutex_);
+    had_previous_image = has_previous_image_;
+    if (had_previous_image) {
+      callback_interval_ms =
+          (callback_start - rclcpp::Time(previous_callback_start_ns_, callback_start.get_clock_type())).seconds() *
+          1000.0;
+      const int64_t stamp_interval_ns = image_stamp_ns - previous_image_stamp_ns_;
+      image_stamp_interval_ms = static_cast<double>(stamp_interval_ns) / 1.0e6;
+      if (stamp_interval_ns > 0) {
+        const auto expected_frames =
+            static_cast<int64_t>(std::llround(static_cast<double>(stamp_interval_ns) * expected_frame_rate_ / 1.0e9));
+        frame_drop_count_ += std::max<int64_t>(0, expected_frames - 1);
+      }
+    }
+    previous_callback_start_ns_ = callback_start.nanoseconds();
+    previous_image_stamp_ns_ = image_stamp_ns;
+    has_previous_image_ = true;
+    frame_drop_count = frame_drop_count_;
+  }
+
+  if (had_previous_image) {
+    metrics::log_scalar("detector/callback_interval_ms", callback_interval_ms);
+  }
+  // TODO: Replace with just logged frame IDs, don't estimate anything here.
+  metrics::log_scalar("detector/frame_drop_count", static_cast<double>(frame_drop_count));
 
   if (!model_) {
     RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "Detector model is not loaded.");
@@ -240,37 +267,35 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
 
   try {
     // Model inference: run the incomming image through the YOLO detector
+    // TODO: Can we just do w/o the cv_bridge?
     const auto cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
-    const auto inference_start = std::chrono::steady_clock::now();
+    const auto inference_start = metrics_clock_->now();
     const auto inference = model_->infer(cv_ptr->image);
-    const auto inference_end = std::chrono::steady_clock::now();
+    const auto inference_end = metrics_clock_->now();
+    const double inference_latency_ms = (inference_end - inference_start).seconds() * 1000.0;
+    metrics::log_scalar("detector/inference_latency_ms", inference_latency_ms);
 
     // Decode YOLO detection
-    // TODO: Pass as ref to be filled; since header is already being passed anyway
+    // TODO: Pass as ref to be filled; or instantiate inside return will move it out of decode_yolo_output
     vision_msgs::msg::Detection2DArray detections;
     detections.header = msg->header;
     detections.detections = decode_yolo_output(inference, msg->header, confidence_threshold_, nms_threshold_);
 
     RCLCPP_DEBUG(get_logger(), "Decoded %zu detections", detections.detections.size());
-
     detections_pub_->publish(detections);
-    const auto callback_end = std::chrono::steady_clock::now();
-    const auto image_age = get_clock()->now() - rclcpp::Time(msg->header.stamp);
 
+    const auto callback_end = metrics_clock_->now();
+    const auto image_age = get_clock()->now() - rclcpp::Time(msg->header.stamp, get_clock()->get_clock_type());
     // TODO: eventually remove; or hide / abstract suitably
     if (had_previous_image) {
       RCLCPP_INFO(get_logger(),
                   "callback_interval=%.1f ms image_stamp_interval=%.1f ms "
-                  "inference=%.1f ms callback=%.1f ms image_age=%.1f ms",
-                  callback_interval_ms, image_stamp_interval_ms,
-                  std::chrono::duration<double, std::milli>(inference_end - inference_start).count(),
-                  std::chrono::duration<double, std::milli>(callback_end - callback_start).count(),
-                  image_age.seconds() * 1000.0);
+                  "inference=%.1f ms callback duration=%.1f ms image_age=%.1f ms",
+                  callback_interval_ms, image_stamp_interval_ms, inference_latency_ms,
+                  (callback_end - callback_start).seconds() * 1000.0, image_age.seconds() * 1000.0);
     } else {
-      RCLCPP_INFO(get_logger(), "inference=%.1f ms callback=%.1f ms image_age=%.1f ms",
-                  std::chrono::duration<double, std::milli>(inference_end - inference_start).count(),
-                  std::chrono::duration<double, std::milli>(callback_end - callback_start).count(),
-                  image_age.seconds() * 1000.0);
+      RCLCPP_INFO(get_logger(), "inference=%.1f ms callback duration=%.1f ms image_age=%.1f ms", inference_latency_ms,
+                  (callback_end - callback_start).seconds() * 1000.0, image_age.seconds() * 1000.0);
     }
 
   } catch (const std::exception &ex) {

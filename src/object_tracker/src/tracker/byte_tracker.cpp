@@ -47,8 +47,10 @@ void ByteTracker::apply_match(Track &track, const Detection &detection) {
   track.last_frame = frame_id_;
 }
 
-void ByteTracker::update(std::span<const Detection> detections, std::vector<TrackedObject> &out) {
+void ByteTracker::update(std::span<const Detection> detections, std::vector<TrackedObject> &out,
+                         const rclcpp::Clock &clock, double &association_latency_ms) {
   ++frame_id_;
+  int64_t association_time_ns = 0;
 
   high_.clear();
   low_.clear();
@@ -79,7 +81,9 @@ void ByteTracker::update(std::span<const Detection> detections, std::vector<Trac
   }
 
   // --- 1st association: high-score detections vs tracked + lost tracks ----------------------
+  auto association_start = clock.now();
   associate(pool_, high_, detections, options_.match_threshold, options_.fuse_score);
+  association_time_ns += (clock.now() - association_start).nanoseconds();
   for (const auto &[r, c] : assignment_.matches) {
     apply_match(tracks_[idx(pool_[idx(r)])], detections[idx(high_[idx(c)])]);
   }
@@ -94,7 +98,9 @@ void ByteTracker::update(std::span<const Detection> detections, std::vector<Trac
     remaining_high_.push_back(high_[idx(c)]);
 
   // --- 2nd association: low-score detections vs still-unmatched tracked tracks --------------
+  association_start = clock.now();
   associate(remaining_tracks_, low_, detections, kSecondStageCostLimit, /*fuse_score=*/false);
+  association_time_ns += (clock.now() - association_start).nanoseconds();
   for (const auto &[r, c] : assignment_.matches) {
     apply_match(tracks_[idx(remaining_tracks_[idx(r)])], detections[idx(low_[idx(c)])]);
   }
@@ -103,7 +109,9 @@ void ByteTracker::update(std::span<const Detection> detections, std::vector<Trac
   }
 
   // --- 3rd association: tentative tracks vs leftover high-score detections ------------------
+  association_start = clock.now();
   associate(unconfirmed_, remaining_high_, detections, kUnconfirmedCostLimit, options_.fuse_score);
+  association_time_ns += (clock.now() - association_start).nanoseconds();
   for (const auto &[r, c] : assignment_.matches) {
     apply_match(tracks_[idx(unconfirmed_[idx(r)])], detections[idx(remaining_high_[idx(c)])]);
   }
@@ -148,6 +156,7 @@ void ByteTracker::update(std::span<const Detection> detections, std::vector<Trac
       out.push_back({track.id, track.box(), track.score, track.class_id, frame_id_ - track.start_frame + 1});
     }
   }
+  association_latency_ms = static_cast<double>(association_time_ns) / 1.0e6;
 }
 
 } // namespace object_tracker
