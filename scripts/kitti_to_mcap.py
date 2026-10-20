@@ -48,13 +48,8 @@ def main() -> None:
         version=9,
         storage_plugin=StoragePlugin.MCAP,
     ) as writer:
-        connection = writer.add_connection(
-            args.topic,
-            msgtype,
-            typestore=typestore,
-        )
+        connection = writer.add_connection(args.topic, msgtype, typestore=typestore)
 
-        # TODO: need proper time stamps
         for index, image_path in enumerate(images):
             timestamp_ns = round(index * NANOSECONDS / args.fps)
             seconds, nanoseconds = divmod(timestamp_ns, NANOSECONDS)

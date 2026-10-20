@@ -23,9 +23,11 @@ private:
                                   const std_msgs::msg::Header &header) const;
 
   ByteTracker tracker_;
+
   rclcpp::Clock::SharedPtr metrics_clock_;
-  double expected_frame_rate_{10.0};
   std::mutex metrics_mutex_;
+
+  double expected_frame_rate_{10.0};
   bool has_previous_detections_{false};
   int64_t previous_detections_stamp_ns_{0};
   int64_t previous_callback_start_ns_{0};

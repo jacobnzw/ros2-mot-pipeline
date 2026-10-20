@@ -79,9 +79,9 @@ void TrackerComponent::detectionsCallback(const vision_msgs::msg::Detection2DArr
   }
 
   if (had_previous_detections) {
-    metrics::log_scalar("tracker/callback_interval_ms", callback_interval_ms);
+    metrics::log_scalar("tracker/callback_interval_ms", callback_interval_ms, detections_stamp_ns);
   }
-  metrics::log_scalar("tracker/frame_drop_count", static_cast<double>(frame_drop_count));
+  metrics::log_scalar("tracker/frame_drop_count", static_cast<double>(frame_drop_count), detections_stamp_ns);
 
   auto detections = convert(*msg);
 
@@ -89,13 +89,13 @@ void TrackerComponent::detectionsCallback(const vision_msgs::msg::Detection2DArr
   std::vector<TrackedObject> tracked_objects;
   double association_latency_ms = 0.0;
   tracker_.update(detections, tracked_objects, *metrics_clock_, association_latency_ms);
-  metrics::log_scalar("tracker/association_latency_ms", association_latency_ms);
-  metrics::log_scalar("tracker/active_tracks", static_cast<double>(tracked_objects.size()));
+  metrics::log_scalar("tracker/association_latency_ms", association_latency_ms, detections_stamp_ns);
+  metrics::log_scalar("tracker/active_tracks", static_cast<double>(tracked_objects.size()), detections_stamp_ns);
 
   auto tracks_out = convert(tracked_objects, msg->header);
   tracks_pub_->publish(tracks_out);
   const auto pipeline_latency = get_clock()->now() - rclcpp::Time(msg->header.stamp, get_clock()->get_clock_type());
-  metrics::log_scalar("pipeline/end_to_end_latency_ms", pipeline_latency.seconds() * 1000.0);
+  metrics::log_scalar("pipeline/end_to_end_latency_ms", pipeline_latency.seconds() * 1000.0, detections_stamp_ns);
 }
 
 std::vector<Detection> TrackerComponent::convert(const vision_msgs::msg::Detection2DArray &detections_msg) const {

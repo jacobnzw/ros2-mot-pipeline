@@ -125,7 +125,11 @@ After running the detector and tracker, their scalar metrics are written to `obj
 the launch working directory. Open it with `rerun object_tracker.rrd`. The recording includes
 detector inference and callback intervals, estimated cumulative frame drops, ByteTrack association
 latency and active-track count, and image-stamp-to-tracker-output latency. Frame-drop estimates use
-the detector's `expected_frame_rate` parameter and the tracker's `frame_rate` parameter.
+the detector's `expected_frame_rate` parameter and the tracker's `frame_rate` parameter. Each metric
+is indexed by the input message timestamp on the `ros_timestamp` timeline so it can be aligned with
+the input images. The detector also logs each compressed input frame to the same recording, so the
+metrics and images can be viewed together without merging recordings; this duplicates image data
+and increases the RRD file size.
 
 To use a system-wide cuDNN installation, set `CUDNN_LIBRARY_DIR` before sourcing the helper. To override the default
 SDK or toolkit locations, set `ONNXRUNTIME_ROOT` or `CUDA_ROOT` first.

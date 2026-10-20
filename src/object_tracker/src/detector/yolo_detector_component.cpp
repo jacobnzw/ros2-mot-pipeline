@@ -255,10 +255,15 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
   }
 
   if (had_previous_image) {
-    metrics::log_scalar("detector/callback_interval_ms", callback_interval_ms);
+    metrics::log_scalar("detector/callback_interval_ms", callback_interval_ms, image_stamp_ns);
   }
   // TODO: Replace with just logged frame IDs, don't estimate anything here.
-  metrics::log_scalar("detector/frame_drop_count", static_cast<double>(frame_drop_count));
+  metrics::log_scalar("detector/frame_drop_count", static_cast<double>(frame_drop_count), image_stamp_ns);
+  try {
+    metrics::log_encoded_image("camera/image_raw/compressed", msg->data, msg->format, image_stamp_ns);
+  } catch (const std::exception &ex) {
+    RCLCPP_ERROR(get_logger(), "Failed to log input image to Rerun: %s", ex.what());
+  }
 
   if (!model_) {
     RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "Detector model is not loaded.");
@@ -273,7 +278,7 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
     const auto inference = model_->infer(cv_ptr->image);
     const auto inference_end = metrics_clock_->now();
     const double inference_latency_ms = (inference_end - inference_start).seconds() * 1000.0;
-    metrics::log_scalar("detector/inference_latency_ms", inference_latency_ms);
+    metrics::log_scalar("detector/inference_latency_ms", inference_latency_ms, image_stamp_ns);
 
     // Decode YOLO detection
     // TODO: Pass as ref to be filled; or instantiate inside return will move it out of decode_yolo_output

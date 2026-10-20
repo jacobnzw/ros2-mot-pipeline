@@ -86,6 +86,7 @@ private:
   std::vector<int> remaining_high_;
   std::vector<int> new_candidates_;
   std::vector<float> cost_;
+
   LinearAssignment solver_;
   AssignmentResult assignment_;
 };
