@@ -177,10 +177,12 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
   declare_parameter("confidence_threshold", 0.25);
   declare_parameter("nms_threshold", 0.45);
   declare_parameter("expected_frame_rate", 10.0);
+  declare_parameter("log_input_image", false);
 
   confidence_threshold_ = get_parameter("confidence_threshold").as_double();
   nms_threshold_ = get_parameter("nms_threshold").as_double();
   expected_frame_rate_ = get_parameter("expected_frame_rate").as_double();
+  log_input_image_ = get_parameter("log_input_image").as_bool();
 
   if (confidence_threshold_ < 0.0 || confidence_threshold_ > 1.0 || nms_threshold_ < 0.0 || nms_threshold_ > 1.0) {
     throw std::invalid_argument("confidence_threshold and nms_threshold must be in [0, 1]");
@@ -259,10 +261,12 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
   }
   // TODO: Replace with just logged frame IDs, don't estimate anything here.
   metrics::log_scalar("detector/frame_drop_count", static_cast<double>(frame_drop_count), image_stamp_ns);
-  try {
-    metrics::log_encoded_image("camera/image_raw/compressed", msg->data, msg->format, image_stamp_ns);
-  } catch (const std::exception &ex) {
-    RCLCPP_ERROR(get_logger(), "Failed to log input image to Rerun: %s", ex.what());
+  if (log_input_image_) {
+    try {
+      metrics::log_encoded_image("camera/image_raw/compressed", msg->data, msg->format, image_stamp_ns);
+    } catch (const std::exception &ex) {
+      RCLCPP_ERROR(get_logger(), "Failed to log input image to Rerun: %s", ex.what());
+    }
   }
 
   if (!model_) {
@@ -295,11 +299,11 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
     if (had_previous_image) {
       RCLCPP_INFO(get_logger(),
                   "callback_interval=%.1f ms image_stamp_interval=%.1f ms "
-                  "inference=%.1f ms callback duration=%.1f ms image_age=%.1f ms",
+                  "inference=%.1f ms callback_duration=%.1f ms image_age=%.1f ms",
                   callback_interval_ms, image_stamp_interval_ms, inference_latency_ms,
                   (callback_end - callback_start).seconds() * 1000.0, image_age.seconds() * 1000.0);
     } else {
-      RCLCPP_INFO(get_logger(), "inference=%.1f ms callback duration=%.1f ms image_age=%.1f ms", inference_latency_ms,
+      RCLCPP_INFO(get_logger(), "inference=%.1f ms callback_duration=%.1f ms image_age=%.1f ms", inference_latency_ms,
                   (callback_end - callback_start).seconds() * 1000.0, image_age.seconds() * 1000.0);
     }
 

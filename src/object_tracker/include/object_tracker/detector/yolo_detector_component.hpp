@@ -24,6 +24,7 @@ private:
   double confidence_threshold_{0.25};
   double nms_threshold_{0.45};
   double expected_frame_rate_{10.0};
+  bool log_input_image_{false};
 
   rclcpp::Clock::SharedPtr metrics_clock_;
   std::mutex metrics_mutex_;
