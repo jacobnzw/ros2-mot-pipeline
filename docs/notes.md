@@ -293,21 +293,61 @@ ros2 launch launch/detector_foxglove_test.launch.py
 
 # ROS Middleware
 
-- TODO: Understand how shared_ptr enables inter-process comms.
 - TODO: Understand [QoS](https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Quality-of-Service-Settings.html)
+- TODO: Understand how shared_ptr enables inter-process comms.
 - TODO: Understand queing pressure: what (causes) is it? alleviation? backpressure causes?
 - TODO: Understand executors (single, multi-threaded, isolated) and callback groups; reentrancy
 - TODO: Understand scheduling, preemption: how it affects the latencies, choice of queue depth etc.
-- TODO: Given a real sensor instead of a bag player, how do the above concerns and mitigation strategies change?
 - TODO: Understand who calls the callbacks? What could cause delays between callback calls?
-- TODO: Understand middleware limits: characterizable using graph theory?
-- TODO: Improve latency of YOLO11n: should be way ~1-3ms, which is way below the current 30ms on RTX3090
+- TODO: Given a real sensor instead of a bag player, how do the above concerns and mitigation strategies change?
 
-## Callback Groups & Executors
+
+## Executors & Callback Groups
+
+- **DDS** delivers messages into a bounded queue according to QoS.
+- The **executor** notices the queue is non-empty and decides *which* callback may run *when*, according to the rules of
+  its threads + callback groups.
+- The OS **scheduler** decides *when that executor thread actually gets a CPU core.*
+- **Callback** finally runs, takes the message out of the queue, and does the work.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Your code (callbacks: image_callback, tracker update…)     │
+├─────────────────────────────────────────────────────────────┤
+│  ROS 2 Executor + Callback Groups                           │  ← you control this
+├─────────────────────────────────────────────────────────────┤
+│  rcl / RMW / DDS (middleware queues, wait-sets, QoS)        │
+├─────────────────────────────────────────────────────────────┤
+│  OS (Linux): threads, scheduler, preemption, CPU cores      │  ← you influence, rarely fully control
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Executors
+
+The executor is a loop (running in one or more threads) that:
+
+- Builds a wait-set of all subscriptions, timers, services, etc.
+- Waits until something is ready (new message, timer expired…).
+- Picks a ready “executable” and *invokes your callback function* in one of its threads.
+
+| Executor | Threads | Behaviour |
+|---|---:|---|
+| `SingleThreadedExecutor` | 1 | All callbacks of all nodes added to it run one after another on the same thread. Simple and safe, but can starve. |
+| `MultiThreadedExecutor` | N (often = number of cores) | Multiple worker threads pull ready callbacks. Parallelism is limited by callback groups. |
+| `EventsExecutor` (newer) | Configurable | More predictable event-driven model; becoming preferred for real-time analysis. |
+
+
+### Callback Groups
 Callback groups control which callbacks are allowed to run in parallel when the executor is `MultiThreaded`. Callback
 groups only matter when you are using a `MultiThreaded` executor. With the plain `component_container`
 (`SingleThreaded`) everything is already serialized.
 
+The concurrency rules
+
+- **MutuallyExclusive (default)**: at most one callback from this group may run at a time. Even on a
+  MultiThreadedExecutor, callbacks in the same mutually-exclusive group are serialised.
+- **Reentrant**: callbacks in this group may run concurrently (including multiple instances of the same callback).
+  Callbacks belonging to different groups may always run in parallel (if the executor has enough threads).
 
 ## Ingress Policies
 Which to use depends on your goal:
@@ -413,3 +453,33 @@ Recommendation
 # Links and References
 
 [ROS2 Tracing](https://github.com/ros2/ros2_tracing)
+
+
+# Appendix: Basics Refresh
+
+## Shared Pointers
+`std::shared_ptr` is a smart pointer that manages shared ownership of a resource via reference counting, ensuring the
+object is automatically deleted only when the last pointer owning it is destroyed. The preferred method is using
+`std::make_shared`, which allocates memory efficiently. Ownership is shared by copying the pointer or using assignment,
+which increments the reference count.
+
+## Clocks
+
+- TODO: Understand "NTP adjustments/drift or time jumps", epochs
+- TODO: monotonic vs non-monotonic clock? wall-time
+
+One gotcha: don't construct a bare `rclcpp::Clock(RCL_ROS_TIME)` yourself — without a `TimeSource` attached it will
+silently fall back to system time. Always use `node->get_clock() `for the ROS-time path. The docs explicitly warn about
+this.
+
+The community consensus (and the direction the API is moving) is to stay within `rclcpp::Clock` / `rclcpp::Time` inside
+nodes, and reserve raw `std::chrono` for code that has no ROS context at all.
+
+**Practical rule of thumb**
+
+| Context | Use |
+|---|---|
+| Node member, timer, callback, message stamp | `node->get_clock()` or `rclcpp::Clock(RCL_STEADY_TIME)` |
+| Free function / test / benchmark with no node | `std::chrono::steady_clock` is fine |
+| Passing a duration to `rclcpp::sleep_for` | `std::chrono::milliseconds(50)` (sanctioned) |
+| Passing a duration to `rclcpp::Rate` | `std::chrono::milliseconds(50)` (sanctioned) |

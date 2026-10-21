@@ -121,7 +121,6 @@ A valid result is a clean offline Python pipeline
     ingress policy and plots end-to-end latency over time.
 - [ ] Topic rates (ros2 topic hz).
 
-
 ### Week 6: 
 
 🏆 Goal: clean up repo, prep summary report, decision on Jetson
@@ -135,6 +134,8 @@ A valid result is a clean offline Python pipeline
 
 
 ## Phase 2: Jetson Deployment
+
+- [ ] Improve latency of YOLO11n: should be way ~1-3ms, which is way below the current 30ms on RTX3090
 
 Rent Jetson at [cloudjetson.com](cloudjetson.com) (~1 USD / hr).
 
