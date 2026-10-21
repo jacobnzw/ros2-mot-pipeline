@@ -34,8 +34,8 @@ target_include_directories(pipeline_metrics
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>"
 )
-target_link_libraries(pipeline_metrics PRIVATE rerun_sdk)
-ament_target_dependencies(pipeline_metrics PUBLIC rclcpp)
+target_link_libraries(pipeline_metrics PRIVATE rerun_sdk fmt::fmt)
+ament_target_dependencies(pipeline_metrics PUBLIC rclcpp sensor_msgs vision_msgs)
 
 set(ONNXRUNTIME_ROOT "$ENV{ONNXRUNTIME_ROOT}" CACHE PATH "ONNX Runtime installation prefix")
 

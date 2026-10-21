@@ -129,7 +129,8 @@ the detector's `expected_frame_rate` parameter and the tracker's `frame_rate` pa
 is indexed by the input message timestamp on the `ros_timestamp` timeline so it can be aligned with
 the input images. Set the detector's `log_input_image` parameter to `true` to include each compressed
 input frame in the same recording as the metrics. This is disabled by default; enabling it duplicates
-image data and increases the RRD file size.
+image data and increases the RRD file size. When enabled, the detector also logs its decoded bounding
+boxes with class IDs and confidence scores over the image.
 
 To use a system-wide cuDNN installation, set `CUDNN_LIBRARY_DIR` before sourcing the helper. To override the default
 SDK or toolkit locations, set `ONNXRUNTIME_ROOT` or `CUDA_ROOT` first.

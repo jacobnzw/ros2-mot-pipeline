@@ -262,13 +262,6 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
   }
   // TODO: Replace with just logged frame IDs, don't estimate anything here.
   metrics::log_scalar("detector/frame_drop_count", static_cast<double>(frame_drop_count), image_stamp_ns);
-  if (log_input_image_) {
-    try {
-      metrics::log_encoded_image("camera/image_raw/compressed", msg->data, msg->format, image_stamp_ns);
-    } catch (const std::exception &ex) {
-      RCLCPP_ERROR(get_logger(), "Failed to log input image to Rerun: %s", ex.what());
-    }
-  }
 
   if (!model_) {
     RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "Detector model is not loaded.");
@@ -291,22 +284,23 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
     detections.header = msg->header;
     detections.detections = decode_yolo_output(inference, msg->header, confidence_threshold_, nms_threshold_);
 
+    if (log_input_image_) {
+      metrics::log_encoded_image("camera/image_raw/compressed", msg, image_stamp_ns);
+      metrics::log_detections("detector/detections", detections, kCocoClassNames, image_stamp_ns);
+    }
+
     RCLCPP_DEBUG(get_logger(), "Decoded %zu detections", detections.detections.size());
     detections_pub_->publish(detections);
 
     const auto callback_end = metrics_clock_->now();
     const auto image_age = get_clock()->now() - rclcpp::Time(msg->header.stamp, get_clock()->get_clock_type());
 
-    // TODO: eventually remove; or hide / abstract suitably
     if (had_previous_image) {
-      RCLCPP_INFO(get_logger(),
-                  "callback_interval=%.1f ms image_stamp_interval=%.1f ms "
-                  "inference=%.1f ms callback_duration=%.1f ms image_age=%.1f ms",
-                  callback_interval_ms, image_stamp_interval_ms, inference_latency_ms,
-                  (callback_end - callback_start).seconds() * 1000.0, image_age.seconds() * 1000.0);
-    } else {
-      RCLCPP_INFO(get_logger(), "inference=%.1f ms callback_duration=%.1f ms image_age=%.1f ms", inference_latency_ms,
-                  (callback_end - callback_start).seconds() * 1000.0, image_age.seconds() * 1000.0);
+      RCLCPP_DEBUG_THROTTLE(get_logger(), *get_clock(), 500,
+                            "callback_interval=%.1f ms image_stamp_interval=%.1f ms "
+                            "inference=%.1f ms callback_duration=%.1f ms image_age=%.1f ms",
+                            callback_interval_ms, image_stamp_interval_ms, inference_latency_ms,
+                            (callback_end - callback_start).seconds() * 1000.0, image_age.seconds() * 1000.0);
     }
 
   } catch (const std::exception &ex) {
@@ -314,7 +308,7 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
   }
 
   // Intra-process comms check: compare addresss with what tracker subscription callback prints
-  RCLCPP_DEBUG(get_logger(), "Publishing at %p", msg.get());
+  RCLCPP_DEBUG_THROTTLE(get_logger(), *get_clock(), 500, "Publishing at %p", msg.get());
 }
 
 } // namespace object_tracker
