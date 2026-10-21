@@ -1,8 +1,12 @@
-from launch.actions import ExecuteProcess
+from launch.actions import DeclareLaunchArgument, ExecuteProcess
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 
 from launch import LaunchDescription
+
+log_level = LaunchConfiguration("log_level")
+log_input_image = LaunchConfiguration("log_input_image")
 
 
 def generate_launch_description():
@@ -19,6 +23,7 @@ def generate_launch_description():
         namespace="",
         package="rclcpp_components",
         executable="component_container",  # multi-threaded: component_container_mt
+        arguments=["--ros-args", "--log-level", log_level],
         composable_node_descriptions=[
             ComposableNode(
                 package="object_tracker",
@@ -30,6 +35,7 @@ def generate_launch_description():
                         "model_path": "models/yolo/yolo11n.onnx",
                         "image_topic": "/camera/image_raw/compressed",
                         "detection_topic": "/detections",
+                        "log_input_image": log_input_image,
                     }
                 ],
                 extra_arguments=[{"use_intra_process_comms": True}],
@@ -58,4 +64,21 @@ def generate_launch_description():
         ],
     )
 
-    return LaunchDescription([kitty_player, tracker_container])
+    return LaunchDescription(
+        [
+            DeclareLaunchArgument(
+                "log_level",
+                default_value="info",
+                choices=["debug", "info", "warn", "error", "fatal"],
+                description="Log level.",
+            ),
+            DeclareLaunchArgument(
+                "log_input_image",
+                default_value="false",
+                choices=["true", "false"],
+                description="Whether to log the detector input image (set to true to enable).",
+            ),
+            kitty_player,
+            tracker_container,
+        ]
+    )

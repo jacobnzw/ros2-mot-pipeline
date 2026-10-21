@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <vector>
 
+#include <rclcpp/clock.hpp>
+
 #include "object_tracker/tracker/detection.hpp"
 #include "object_tracker/tracker/kalman_filter.hpp"
 #include "object_tracker/tracker/linear_assignment.hpp"
@@ -43,7 +45,8 @@ public:
 
   // Detections must be in source-image pixels and should include low-score boxes (run the
   // decoder with score threshold <= low_threshold). Writes confirmed tracks to `out`.
-  void update(std::span<const Detection> detections, std::vector<TrackedObject> &out);
+  void update(std::span<const Detection> detections, std::vector<TrackedObject> &out, const rclcpp::Clock &clock,
+              double &association_latency_ms);
   void reset();
 
   [[nodiscard]] int frame_index() const noexcept { return frame_id_; }
@@ -83,6 +86,7 @@ private:
   std::vector<int> remaining_high_;
   std::vector<int> new_candidates_;
   std::vector<float> cost_;
+
   LinearAssignment solver_;
   AssignmentResult assignment_;
 };

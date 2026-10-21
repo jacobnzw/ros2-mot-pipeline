@@ -111,13 +111,15 @@ A valid result is a clean offline Python pipeline
 #### KPIs & Parameters
 
 - [ ] End-to-end latency (t_track_output – t_image_stamp).
-- [ ] Per-stage latencies (p50/p95/p99).
+- [ ] Per-stage latencies (p50/p95/p99)
+  - YOLO inference
+  - ByteTrack association
+  - Frame drop count, inter-callback intervals, DEFINE: jitter, starvation
 - [ ] Queue depth and drop rate under sustained replay.
   - [ ] [takt-vision's stress test](https://github.com/GBR-RL/takt-vision/blob/main/scripts/overload_experiment.sh) The
     overload experiment: a 30 fps camera feeding a detector that manages only ~25 fps. Runs the same scenario under each
     ingress policy and plots end-to-end latency over time.
 - [ ] Topic rates (ros2 topic hz).
-
 
 ### Week 6: 
 
@@ -132,6 +134,8 @@ A valid result is a clean offline Python pipeline
 
 
 ## Phase 2: Jetson Deployment
+
+- [ ] Improve latency of YOLO11n: should be way ~1-3ms, which is way below the current 30ms on RTX3090
 
 Rent Jetson at [cloudjetson.com](cloudjetson.com) (~1 USD / hr).
 

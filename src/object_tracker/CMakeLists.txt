@@ -20,6 +20,23 @@ find_package(OpenCV REQUIRED COMPONENTS core imgcodecs imgproc dnn)
 find_package(fmt REQUIRED)
 find_package(Eigen3 REQUIRED)
 
+# Fetch ReRun C++ SDK
+include(FetchContent)
+FetchContent_Declare(rerun_sdk URL
+    https://github.com/rerun-io/rerun/releases/latest/download/rerun_cpp_sdk.zip
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+FetchContent_MakeAvailable(rerun_sdk)
+set_target_properties(rerun_sdk PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+add_library(pipeline_metrics SHARED src/metrics.cpp)
+target_include_directories(pipeline_metrics
+  PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:include>"
+)
+target_link_libraries(pipeline_metrics PRIVATE rerun_sdk fmt::fmt)
+ament_target_dependencies(pipeline_metrics PUBLIC rclcpp sensor_msgs vision_msgs)
+
 set(ONNXRUNTIME_ROOT "$ENV{ONNXRUNTIME_ROOT}" CACHE PATH "ONNX Runtime installation prefix")
 
 # Flag to enable CUDA build, default ON
@@ -98,7 +115,7 @@ target_include_directories(yolo_detector_component
   "${ONNXRUNTIME_INCLUDE_DIR}"
   ${OpenCV_INCLUDE_DIRS}
 )
-target_link_libraries(yolo_detector_component PUBLIC yolo_onnx)
+target_link_libraries(yolo_detector_component PUBLIC yolo_onnx PRIVATE pipeline_metrics)
 ament_target_dependencies(yolo_detector_component
   PUBLIC
   rclcpp
@@ -138,7 +155,7 @@ target_include_directories(tracker_component
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>"
 )
-target_link_libraries(tracker_component PRIVATE "${cpp_typesupport_target}" Eigen3::Eigen)
+target_link_libraries(tracker_component PRIVATE "${cpp_typesupport_target}" Eigen3::Eigen pipeline_metrics)
 ament_target_dependencies(tracker_component
   PUBLIC
   rclcpp
@@ -148,7 +165,7 @@ ament_target_dependencies(tracker_component
 )
 rclcpp_components_register_nodes(tracker_component "object_tracker::TrackerComponent")
 
-install(TARGETS yolo_onnx onnx_probe yolo_detector_component yolo_detector_observer tracker_component
+install(TARGETS yolo_onnx onnx_probe pipeline_metrics yolo_detector_component yolo_detector_observer tracker_component
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}

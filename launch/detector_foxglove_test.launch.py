@@ -30,6 +30,7 @@ def generate_launch_description():
                         "model_path": "models/yolo/yolo11n.onnx",
                         "image_topic": "/camera/image_raw/compressed",
                         "detection_topic": "/detections",
+                        "log_input_image": False,
                     }
                 ],
                 extra_arguments=[{"use_intra_process_comms": True}],
