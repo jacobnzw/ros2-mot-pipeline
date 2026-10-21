@@ -51,6 +51,8 @@ TrackerComponent::TrackerComponent(const rclcpp::NodeOptions &options) : Node("t
 }
 
 void TrackerComponent::detectionsCallback(const vision_msgs::msg::Detection2DArray::ConstSharedPtr msg) {
+  RCLCPP_DEBUG(get_logger(), "Received at   %p", msg.get());
+
   const auto callback_start = metrics_clock_->now();
   const int64_t detections_stamp_ns = rclcpp::Time(msg->header.stamp).nanoseconds();
   double callback_interval_ms = 0.0;

@@ -3,6 +3,7 @@
 #include <cv_bridge/cv_bridge.hpp>
 #include <object_tracker/metrics.hpp>
 #include <opencv2/dnn/dnn.hpp>
+#include <rclcpp/logging.hpp>
 #include <rclcpp/qos.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
 #include <sensor_msgs/image_encodings.hpp>
@@ -295,6 +296,7 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
 
     const auto callback_end = metrics_clock_->now();
     const auto image_age = get_clock()->now() - rclcpp::Time(msg->header.stamp, get_clock()->get_clock_type());
+
     // TODO: eventually remove; or hide / abstract suitably
     if (had_previous_image) {
       RCLCPP_INFO(get_logger(),
@@ -310,6 +312,9 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
   } catch (const std::exception &ex) {
     RCLCPP_ERROR(get_logger(), "Inference failed: %s", ex.what());
   }
+
+  // Intra-process comms check: compare addresss with what tracker subscription callback prints
+  RCLCPP_DEBUG(get_logger(), "Publishing at %p", msg.get());
 }
 
 } // namespace object_tracker
