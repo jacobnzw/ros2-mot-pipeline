@@ -455,9 +455,11 @@ Recommendation
 - If the detector might later support batching or adaptive behaviors, a larger buffer can enable batching at the cost of
   staleness — design intentionally for that.
 
+
 # Links and References
 
-[ROS2 Tracing](https://github.com/ros2/ros2_tracing)
+- [ROS2 Pulse](https://github.com/TanayK07/ros2_pulse)
+- [ROS2 Tracing](https://github.com/ros2/ros2_tracing)
 
 
 # Appendix: Basics Refresh
