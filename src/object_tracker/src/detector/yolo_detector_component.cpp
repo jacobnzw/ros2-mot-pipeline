@@ -39,9 +39,13 @@ struct DetectionCandidate {
   cv::Rect2d box;
 };
 
-std::vector<vision_msgs::msg::Detection2D> decode_yolo_output(const InferenceResult &inference,
-                                                              const std_msgs::msg::Header &header,
-                                                              double confidence_threshold, double nms_threshold) {
+vision_msgs::msg::Detection2DArray decode_yolo_output(const InferenceResult &inference,
+                                                      const std_msgs::msg::Header &header,
+                                                      double confidence_threshold, double nms_threshold) {
+  vision_msgs::msg::Detection2DArray detections_array;
+  detections_array.header = header;
+  auto &detections = detections_array.detections;
+
   if (inference.outputs.size() != 1) {
     throw std::runtime_error("YOLO decoder expects exactly one output tensor");
   }
@@ -115,7 +119,6 @@ std::vector<vision_msgs::msg::Detection2D> decode_yolo_output(const InferenceRes
     candidates.push_back({class_id, score, cv::Rect2d(x0, y0, x1 - x0, y1 - y0)});
   }
 
-  std::vector<vision_msgs::msg::Detection2D> detections;
   // For each COCO object class_id...
   // TODO: potentially restrict to only car and person (peds)
   for (int class_id = 0; class_id < static_cast<int>(kCocoClassNames.size()); ++class_id) {
@@ -162,7 +165,7 @@ std::vector<vision_msgs::msg::Detection2D> decode_yolo_output(const InferenceRes
   std::sort(detections.begin(), detections.end(), [](const auto &left, const auto &right) {
     return left.results.front().hypothesis.score > right.results.front().hypothesis.score;
   });
-  return detections;
+  return detections_array;
 }
 
 } // namespace
@@ -278,11 +281,8 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
     const double inference_latency_ms = (inference_end - inference_start).seconds() * 1000.0;
     metrics::log_scalar("detector/inference_latency_ms", inference_latency_ms, image_stamp_ns);
 
-    // Decode YOLO detection
-    // TODO: Pass as ref to be filled; or instantiate inside return will move it out of decode_yolo_output
-    vision_msgs::msg::Detection2DArray detections;
-    detections.header = msg->header;
-    detections.detections = decode_yolo_output(inference, msg->header, confidence_threshold_, nms_threshold_);
+    // Decode YOLO detections
+    auto detections = decode_yolo_output(inference, msg->header, confidence_threshold_, nms_threshold_);
 
     if (log_input_image_) {
       metrics::log_encoded_image("camera/image_raw/compressed", msg, image_stamp_ns);
