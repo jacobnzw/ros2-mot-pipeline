@@ -464,16 +464,169 @@ Recommendation
 
 # Appendix: Basics Refresh
 
-## Shared Pointers
+## Stack vs Heap vs Static Storage
+
+| Feature | Stack | Heap | Static |
+|---|---|---|---|
+| **Allocation** | Automatic (compiler) | Manual (`new` / `malloc`) | At program start (link time) |
+| **Deallocation** | Automatic (scope exit) | Manual (`delete` / `free`) | Never (program exit) |
+| **Lifetime** | Scope-bound | Until explicitly freed | Entire program |
+| **Size** | Small (1–8 MB typical) | Large (limited by RAM) | Fixed at compile time |
+| **Speed** | Fastest (pointer adjust) | Slowest (allocator search) | Fast (fixed address) |
+| **Fragmentation** | Never | Can fragment | Never |
+| **Thread safety** | Each thread has its own | Shared — needs sync | Shared — needs sync |
+| **Typical use** | Local vars, function params | Dynamic/large/poly objects | Globals, `static` members, constants |
+
+```cpp
+int x = 5;              // stack
+static int y = 10;      // static storage
+int* p = new int(3);    // heap   
+```
+
+## Ownership & Smart Pointers
+
+**Ownership** means: *the responsibility to free the object*. A smart pointer encodes this in its **type** — the
+compiler enforces it.
+
+A raw pointer (`T*`) is just an address. It tells you nothing about who must call `delete`. The same syntax `int* p` can
+mean:
+
+- **I own this and must delete it**
+- **I'm just borrowing it; someone else deletes it**
+- **I'm pointing at a stack/global variable; nobody should delete it**
+
+```cpp
+void f(int* p) { /* who deletes p? The type doesn't say. */ }
+```
+
+This ambiguity is the core problem. With smart pointers, the type itself is the contract:
+
+```cpp
+void g(std::unique_ptr<int> p);   // "I take ownership, I'll delete it"
+void h(std::shared_ptr<int> p);   // "We share ownership"
+void k(int* p);                   // "I'm just looking, I won't delete"
+```
+
+The [C++ Core Guidelines](https://cpp-core-guidelines-docs.vercel.app/resource) (R.3) state this explicitly:
+
+> *A raw pointer (`T*`) is non-owning.*
+
+In modern C++, raw pointers are used *only* as non-owning observers (pointing to stack, global, or smart-pointer-managed
+objects). If you need ownership, the type must say so — that's what `unique_ptr` / `shared_ptr` are for.
+
+
+### `std::unique_ptr` — Exclusive Ownership
+
+At any given moment, **exactly one** `unique_ptr` owns the object. It enforces this by being **move-only** (copy is
+deleted):
+
+```cpp
+auto p1 = std::make_unique<int>(42);
+// auto p2 = p1;          // ❌ compile error: copy deleted
+auto p2 = std::move(p1);  // ✅ ownership transferred, p1 is now nullptr
+```
+
+Ownership can be *transferred* (via `std::move`), but never *shared*.
+
+### `std::shared_ptr` - Shared Ownership
 `std::shared_ptr` is a smart pointer that manages shared ownership of a resource via reference counting, ensuring the
 object is automatically deleted only when the last pointer owning it is destroyed. The preferred method is using
 `std::make_shared`, which allocates memory efficiently. Ownership is shared by copying the pointer or using assignment,
 which increments the reference count.
 
-## Clocks
 
-- TODO: Understand "NTP adjustments/drift or time jumps", epochs
-- TODO: monotonic vs non-monotonic clock? wall-time
+Common usage patterns include:
+
+**1. Basic Creation and Sharing** Use `std::make_shared` for efficiency. Copying the pointer increments the reference
+count (`use_count`).
+```cpp
+#include <memory>
+#include <iostream>
+
+int main() {
+    // Create shared ownership
+    std::shared_ptr<int> p1 = std::make_shared<int>(42);
+    std::shared_ptr<int> p2 = p1; // Shares ownership
+    
+    std::cout << "Count: " << p1.use_count() << std::endl; // Output: 2
+    
+    // Object is destroyed only when both go out of scope
+}
+```
+
+**2. Storing in Containers** Shared pointers allow storing polymorphic objects in standard containers like
+`std::vector`.
+```cpp
+#include <memory>
+#include <vector>
+
+struct Entity { virtual ~Entity() {} };
+
+int main() {
+    std::vector<std::shared_ptr<Entity>> entities;
+    entities.push_back(std::make_shared<Entity>());
+    // Memory automatically managed when vector is cleared
+}
+```
+
+**3. Passing to Functions** Pass by value to increment the reference count locally, or by `const&` to avoid overhead.
+```cpp
+void process(std::shared_ptr<int> ptr) {
+    // ptr is a copy; ref count increases here
+}
+
+int main() {
+    auto p = std::make_shared<int>(10);
+    process(p); // Safe sharing
+}
+```
+
+**Key Considerations:**
+*   **Performance**: Slightly heavier than `std::unique_ptr` due to atomic reference counting.
+*   **Circular References**: Can cause memory leaks if objects reference each other; use `std::weak_ptr` to break
+    cycles.
+*   **Raw Pointers**: Never create multiple `shared_ptr` instances from the same raw pointer.
+
+
+### Smart Pointers are designed for Heap-Allocated Objects
+
+A pointer is just a variable that holds a memory address. It can point to:
+
+| Target | Example |
+|---|---|
+| **Stack** | `int x = 5; int* p = &x;` |
+| **Heap** | `int* p = new int(5);` |
+| **Static / global** | `static int g; int* p = &g;` |
+
+The pointer *variable itself* can also live on the stack, the heap, or in static storage — it's independent of what it
+points to.
+
+However, `unique_ptr` and `shared_ptr` are designed for **heap-allocated** objects because their default deleter calls
+`delete`. Pointing a smart pointer at a stack variable is undefined behavior — the object will be destroyed by scope
+exit *and* by the smart pointer's destructor (double free). For stack objects, use a **raw pointer** (or better, a
+reference) with no ownership semantics.
+
+
+
+## Clocks: Wall, Steady, and ROS time
+
+- **System/wall time** (`std::chrono::system_clock`) represents calendar time. Network Time Protocol (NTP) synchronizes
+  a computer's clock with time servers. NTP corrections are adjustments that compensate for differences between the
+  computer's clock and the reference time; they can gradually speed up or slow down the clock, or occasionally step it
+  forward or backward. Manual changes or virtualization can also adjust wall time. Use it for real-world timestamps, not
+  for measuring elapsed time.
+- **Steady time** (`std::chrono::steady_clock` or `RCL_STEADY_TIME`) is monotonic: wall-clock corrections do not make it
+  go backward. Its epoch is unspecified, so its values are not calendar timestamps. Use differences between readings for
+  timeouts, durations, and latency measurements.
+- **ROS time** (`RCL_ROS_TIME`) follows system time unless a ROS time source is active, commonly `/clock` when
+  `use_sim_time` is enabled. Simulated time can pause, run at a different rate, or jump forward or backward (for
+  example, when a simulation starts, resets, or seeks). It may be zero before the first simulated clock value; check
+  whether ROS time is active and whether the timestamp is valid before relying on it.
+
+An **epoch** is the origin from which a clock measures time. Clock values with different types or epochs are not
+interchangeable: a steady-clock value is not a date, and timestamps from separate simulation runs should not be compared
+or subtracted as though they shared an origin. Use a consistent clock for elapsed-time calculations, and account for
+ROS-time jumps when maintaining timers or state across simulation resets.
 
 One gotcha: don't construct a bare `rclcpp::Clock(RCL_ROS_TIME)` yourself — without a `TimeSource` attached it will
 silently fall back to system time. Always use `node->get_clock() `for the ROS-time path. The docs explicitly warn about
