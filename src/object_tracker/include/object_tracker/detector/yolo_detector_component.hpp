@@ -26,6 +26,7 @@ private:
   double expected_frame_rate_{10.0};
   bool log_input_image_{false};
 
+  // TODO: move to metrics possible?
   rclcpp::Clock::SharedPtr metrics_clock_;
   std::mutex metrics_mutex_;
 

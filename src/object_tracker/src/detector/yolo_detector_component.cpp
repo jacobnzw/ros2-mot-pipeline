@@ -1,6 +1,7 @@
 #include "object_tracker/detector/yolo_detector_component.hpp"
 
 #include <cv_bridge/cv_bridge.hpp>
+#include <memory>
 #include <object_tracker/metrics.hpp>
 #include <opencv2/dnn/dnn.hpp>
 #include <rclcpp/logging.hpp>
@@ -197,8 +198,7 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
 
   const auto model_path = get_parameter("model_path").as_string();
   if (model_path.empty()) {
-    RCLCPP_ERROR(get_logger(), "Parameter 'model_path' is required before "
-                               "loading the detector component.");
+    RCLCPP_ERROR(get_logger(), "Parameter 'model_path' is required before loading the detector component.");
     return;
   }
 
@@ -228,6 +228,11 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
 }
 
 void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImage::ConstSharedPtr msg) {
+  if (!model_) {
+    RCLCPP_FATAL_THROTTLE(get_logger(), *get_clock(), 5000, "Detector model is not loaded.");
+    return;
+  }
+
   const auto callback_start = metrics_clock_->now();
   const auto image_stamp_ns = rclcpp::Time(msg->header.stamp).nanoseconds();
   double callback_interval_ms = 0.0;
@@ -263,11 +268,6 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
   // TODO: Replace with just logged frame IDs, don't estimate anything here.
   metrics::log_scalar("detector/frame_drop_count", static_cast<double>(frame_drop_count), image_stamp_ns);
 
-  if (!model_) {
-    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "Detector model is not loaded.");
-    return;
-  }
-
   try {
     // Model inference: run the incomming image through the YOLO detector
     // TODO: Can we just do w/o the cv_bridge?
@@ -290,7 +290,10 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
     }
 
     RCLCPP_DEBUG(get_logger(), "Decoded %zu detections", detections.detections.size());
-    detections_pub_->publish(detections);
+    auto detections_msg =
+        std::make_unique<vision_msgs::msg::Detection2DArray>(std::move(detections));
+    RCLCPP_DEBUG(get_logger(), "Publishing detections at %p", static_cast<void *>(detections_msg.get()));
+    detections_pub_->publish(std::move(detections_msg));
 
     const auto callback_end = metrics_clock_->now();
     const auto image_age = get_clock()->now() - rclcpp::Time(msg->header.stamp, get_clock()->get_clock_type());
@@ -306,9 +309,6 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
   } catch (const std::exception &ex) {
     RCLCPP_ERROR(get_logger(), "Inference failed: %s", ex.what());
   }
-
-  // Intra-process comms check: compare addresss with what tracker subscription callback prints
-  RCLCPP_DEBUG_THROTTLE(get_logger(), *get_clock(), 500, "Publishing at %p", msg.get());
 }
 
 } // namespace object_tracker

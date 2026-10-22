@@ -43,15 +43,15 @@ TrackerComponent::TrackerComponent(const rclcpp::NodeOptions &options) : Node("t
   const auto qos_sub = rclcpp::SensorDataQoS().keep_last(1);
   detections_sub_ = create_subscription<vision_msgs::msg::Detection2DArray>(
       detections_topic, qos_sub,
-      [this](const vision_msgs::msg::Detection2DArray::ConstSharedPtr msg) { this->detectionsCallback(msg); });
+      [this](vision_msgs::msg::Detection2DArray::UniquePtr msg) { this->detectionsCallback(std::move(msg)); });
 
   const auto tracks_topic = get_parameter("tracks_topic").as_string();
   const auto qos_pub = rclcpp::SensorDataQoS().keep_last(1);
   tracks_pub_ = create_publisher<object_tracker::msg::TrackedObjectArray>(tracks_topic, qos_pub);
 }
 
-void TrackerComponent::detectionsCallback(const vision_msgs::msg::Detection2DArray::ConstSharedPtr msg) {
-  RCLCPP_DEBUG(get_logger(), "Received at   %p", msg.get());
+void TrackerComponent::detectionsCallback(const vision_msgs::msg::Detection2DArray::UniquePtr msg) {
+  RCLCPP_DEBUG(get_logger(), "Received detections at %p", static_cast<const void *>(msg.get()));
 
   const auto callback_start = metrics_clock_->now();
   const int64_t detections_stamp_ns = rclcpp::Time(msg->header.stamp).nanoseconds();

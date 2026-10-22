@@ -17,7 +17,7 @@ public:
   explicit TrackerComponent(const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
 
 private:
-  void detectionsCallback(const vision_msgs::msg::Detection2DArray::ConstSharedPtr msg);
+  void detectionsCallback(const vision_msgs::msg::Detection2DArray::UniquePtr msg);
   std::vector<Detection> convert(const vision_msgs::msg::Detection2DArray &detections_msg) const;
   msg::TrackedObjectArray convert(const std::vector<TrackedObject> &tracked_objects,
                                   const std_msgs::msg::Header &header) const;

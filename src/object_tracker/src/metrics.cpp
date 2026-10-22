@@ -1,8 +1,8 @@
 #include "object_tracker/metrics.hpp"
 
+#include <fmt/format.h>
 #include <rclcpp/node.hpp>
 #include <rerun.hpp>
-#include <fmt/format.h>
 
 #include <algorithm>
 #include <cctype>
@@ -14,10 +14,12 @@
 #include <vector>
 
 namespace object_tracker::metrics {
-namespace {
+namespace { // makes recording_stream local to ::metrics namespace
 
-// TODO: why like this? static?
 rerun::RecordingStream &recording_stream() {
+  // Function-local static ensures singleton-like behavior.
+  // First call instantiates, subsequent calls only return.
+  // In C++11 and later, that first initialization is thread-safe.
   static rerun::RecordingStream stream("ros2-mot-pipeline");
   return stream;
 }
@@ -103,8 +105,7 @@ void log_detections(std::string_view entity_path, const vision_msgs::msg::Detect
     if (!detection.results.empty()) {
       const auto &hypothesis = detection.results.front().hypothesis;
       int class_id = 0;
-      std::from_chars(hypothesis.class_id.data(),
-                      hypothesis.class_id.data() + hypothesis.class_id.size(), class_id);
+      std::from_chars(hypothesis.class_id.data(), hypothesis.class_id.data() + hypothesis.class_id.size(), class_id);
       const char *class_name = class_names[static_cast<size_t>(class_id)];
       label = fmt::format("{} {:.4f}", class_name, hypothesis.score);
     }
