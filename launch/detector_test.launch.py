@@ -22,8 +22,11 @@ def generate_launch_description():
         name="tracker_container",
         namespace="",
         package="rclcpp_components",
-        executable="component_container",  # multi-threaded: component_container_mt
-        arguments=["--ros-args", "--log-level", log_level],
+        executable="component_container_mt",  # multi-threaded: component_container_mt
+        arguments=["--ros-args", "--log-level", log_level, "-p", "thread_num:=4"],
+        # prefix="taskset -c 2-5",  # Pin the container process to cores 2-5.
+        # prefix="chrt --fifo 10",  # Change the container process scheduling policy to FIFO
+        # prefix="taskset -c 2-5 chrt --fifo 10",
         composable_node_descriptions=[
             ComposableNode(
                 package="object_tracker",

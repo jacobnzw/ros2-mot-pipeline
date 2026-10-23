@@ -39,11 +39,16 @@ TrackerComponent::TrackerComponent(const rclcpp::NodeOptions &options) : Node("t
   metrics_clock_ = metrics::create_clock(*this);
   metrics::initialize_rerun();
 
+  // SUBSCRIPTION for detection messages
+  // Separate callback group to allow parallel execution with detector component in MultiThreaded executor
   const auto detections_topic = get_parameter("detections_topic").as_string();
   const auto qos_sub = rclcpp::SensorDataQoS().keep_last(1);
+  rclcpp::SubscriptionOptions sub_opts;
+  sub_opts.callback_group = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   detections_sub_ = create_subscription<vision_msgs::msg::Detection2DArray>(
       detections_topic, qos_sub,
-      [this](vision_msgs::msg::Detection2DArray::UniquePtr msg) { this->detectionsCallback(std::move(msg)); });
+      [this](vision_msgs::msg::Detection2DArray::UniquePtr msg) { this->detectionsCallback(std::move(msg)); },
+      sub_opts);
 
   const auto tracks_topic = get_parameter("tracks_topic").as_string();
   const auto qos_pub = rclcpp::SensorDataQoS().keep_last(1);
@@ -56,8 +61,7 @@ void TrackerComponent::detectionsCallback(const vision_msgs::msg::Detection2DArr
   const auto latencies = measure_latencies(rclcpp::Time(msg->header.stamp));
 
   if (latencies.had_previous_detections) {
-    metrics::log_scalar("tracker/callback_interval_ms", latencies.callback_interval_ms,
-                        latencies.detections_stamp_ns);
+    metrics::log_scalar("tracker/callback_interval_ms", latencies.callback_interval_ms, latencies.detections_stamp_ns);
   }
   metrics::log_scalar("tracker/frame_drop_count", static_cast<double>(latencies.frame_drop_count),
                       latencies.detections_stamp_ns);
