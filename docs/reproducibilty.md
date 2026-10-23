@@ -7,7 +7,8 @@
 | **Tracker** | ByteTrack | Very fast: it's only associator + KF|
 
 - One annotated sequence for metrics: KITTI Tracking.
-- One ROS-compatible source: a public ROS bag or a short self-recorded sequence (plan the recording this week if none exists).
+- One ROS-compatible source: a public ROS bag or a short self-recorded sequence (plan the recording this week if none
+  exists).
 
 ## Dataset
 KITTI Multi-Object Tracking sequences
@@ -63,7 +64,8 @@ by Running analysis script
 
 `uv run scripts/kitti_label_stats.py data/kitti/left_color/training/label_02`
 
-and inspecting the table showing object type counts across frames. Choosing sequences that are somewhat complementary in the number of `Pedestrian` / `Person`/ `Cyclist` and `Car`/`Van`/`Truck`.
+and inspecting the table showing object type counts across frames. Choosing sequences that are somewhat complementary in
+the number of `Pedestrian` / `Person`/ `Cyclist` and `Car`/`Van`/`Truck`.
 
 | Sequence | Length | Car | Cyclist | DontCare | Misc | Pedestrian | Person | Tram | Truck | Van | Objects Total |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -115,7 +117,8 @@ uv run scripts/latency_bench.py --kitti-seq path/to/downloaded/kitti/left_color/
 ```
 Numbers should be similar. Exactly the same numbers impossible due to varying CPU/GPU load.
 
-Using image resolution `(352, 1216)` as that's the closest multiple of `32` to the original `(375, 1242)`, required by the YOLO11-N detector.
+Using image resolution `(352, 1216)` as that's the closest multiple of `32` to the original `(375, 1242)`, required by
+the YOLO11-N detector.
 
 **Results**
 
@@ -172,7 +175,7 @@ dataset_config = {
     "CLASSES_TO_EVAL": ["car", "pedestrian"],
 }
 ```
-The ByteTrack predictions for sequence 0019 should be placed in 
+The ByteTrack predictions for sequence 0019 should be placed in
 
 ```
 data/kitti/trackers/bytetrack/data/0019.txt
@@ -181,8 +184,8 @@ Create `.seqmap` file under `{GT_FOLDER}/evaluate_tracking.seqmap.training` with
 ```
 0019 {GT_FOLDER}/image_02/0019 000000 001059
 ```
-indicating sequence number, path, start frame, sequence length. 
-Replace `{GT_FOLDER}` in the path specs with whatever it's set to in the `dataset_config`.
+indicating sequence number, path, start frame, sequence length. Replace `{GT_FOLDER}` in the path specs with whatever
+it's set to in the `dataset_config`.
 
 
 Running this will produce the prediction for sequence `0019`
@@ -286,6 +289,10 @@ Evaluating 1 tracker(s) on 1 sequence(s) for 2 class(es) on Kitti2DBox dataset u
 
 ## ONNX Export
 
+Via Ultralytics CLI with [export settings](https://docs.ultralytics.com/usage/cfg#export-settings) See
+[Export Guide](https://docs.ultralytics.com/modes/export).
+
+
 ```shell
 uv run yolo detect export model=yolo11n.pt format=onnx imgsz=352,1216
 ```
@@ -300,4 +307,14 @@ Results saved to /home/jacob/ros2-mot-pipeline/yolo11n.onnx
 Predict:         yolo predict task=detect model=yolo11n.onnx imgsz=352,1216 
 Validate:        yolo val task=detect model=yolo11n.onnx imgsz=352,1216   WARNING ⚠️ non-PyTorch val requires square images, 'imgsz=[352, 1216]' will not work. Use export 'imgsz=1216' if val is required.
 Visualize:       https://netron.app
+```
+
+Export to FP16
+```shell
+uv run yolo export model=models/yolo/yolo11n.pt format=onnx imgsz=352,1216 half=True
+```
+
+Export TensorRT engine to INT8, needs calibration dataset supplied via dataset_yaml
+```shell
+uv run yolo export model=models/yolo/yolo11n.pt format=engine imgsz=352,1216 int8=True data={dataset_yaml}
 ```
