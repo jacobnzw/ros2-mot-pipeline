@@ -53,13 +53,37 @@ TrackerComponent::TrackerComponent(const rclcpp::NodeOptions &options) : Node("t
 void TrackerComponent::detectionsCallback(const vision_msgs::msg::Detection2DArray::UniquePtr msg) {
   RCLCPP_DEBUG(get_logger(), "Received detections at %p", static_cast<const void *>(msg.get()));
 
+  const auto latencies = measure_latencies(rclcpp::Time(msg->header.stamp));
+
+  if (latencies.had_previous_detections) {
+    metrics::log_scalar("tracker/callback_interval_ms", latencies.callback_interval_ms,
+                        latencies.detections_stamp_ns);
+  }
+  metrics::log_scalar("tracker/frame_drop_count", static_cast<double>(latencies.frame_drop_count),
+                      latencies.detections_stamp_ns);
+
+  auto detections = convert(*msg);
+
+  const auto tracker_result = tracker_.update(detections, *metrics_clock_);
+  metrics::log_scalar("tracker/association_latency_ms", tracker_result.association_latency_ms,
+                      latencies.detections_stamp_ns);
+  metrics::log_scalar("tracker/active_tracks", static_cast<double>(tracker_result.tracked_objects.size()),
+                      latencies.detections_stamp_ns);
+
+  auto tracks_out = convert(tracker_result.tracked_objects, msg->header);
+  tracks_pub_->publish(tracks_out);
+  const auto pipeline_latency = get_clock()->now() - rclcpp::Time(msg->header.stamp, get_clock()->get_clock_type());
+  metrics::log_scalar("pipeline/end_to_end_latency_ms", pipeline_latency.seconds() * 1000.0,
+                      latencies.detections_stamp_ns);
+}
+
+TrackerComponent::Latencies TrackerComponent::measure_latencies(const rclcpp::Time &detections_stamp) {
   const auto callback_start = metrics_clock_->now();
-  const int64_t detections_stamp_ns = rclcpp::Time(msg->header.stamp).nanoseconds();
+  const int64_t detections_stamp_ns = detections_stamp.nanoseconds();
   double callback_interval_ms = 0.0;
   int64_t frame_drop_count = 0;
   bool had_previous_detections = false;
 
-  // TODO: CONVOLUTED AF: find better solution if possible; why mutex needed, to ensure measurement atomic?
   {
     std::lock_guard lock(metrics_mutex_);
     had_previous_detections = has_previous_detections_;
@@ -80,24 +104,7 @@ void TrackerComponent::detectionsCallback(const vision_msgs::msg::Detection2DArr
     frame_drop_count = frame_drop_count_;
   }
 
-  if (had_previous_detections) {
-    metrics::log_scalar("tracker/callback_interval_ms", callback_interval_ms, detections_stamp_ns);
-  }
-  metrics::log_scalar("tracker/frame_drop_count", static_cast<double>(frame_drop_count), detections_stamp_ns);
-
-  auto detections = convert(*msg);
-
-  // TODO: return tracked_objects and association_latency + whatever else, rely on RVO via move
-  std::vector<TrackedObject> tracked_objects;
-  double association_latency_ms = 0.0;
-  tracker_.update(detections, tracked_objects, *metrics_clock_, association_latency_ms);
-  metrics::log_scalar("tracker/association_latency_ms", association_latency_ms, detections_stamp_ns);
-  metrics::log_scalar("tracker/active_tracks", static_cast<double>(tracked_objects.size()), detections_stamp_ns);
-
-  auto tracks_out = convert(tracked_objects, msg->header);
-  tracks_pub_->publish(tracks_out);
-  const auto pipeline_latency = get_clock()->now() - rclcpp::Time(msg->header.stamp, get_clock()->get_clock_type());
-  metrics::log_scalar("pipeline/end_to_end_latency_ms", pipeline_latency.seconds() * 1000.0, detections_stamp_ns);
+  return {detections_stamp_ns, callback_interval_ms, frame_drop_count, had_previous_detections};
 }
 
 std::vector<Detection> TrackerComponent::convert(const vision_msgs::msg::Detection2DArray &detections_msg) const {

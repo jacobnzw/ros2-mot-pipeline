@@ -40,8 +40,8 @@ struct DetectionCandidate {
 };
 
 vision_msgs::msg::Detection2DArray decode_yolo_output(const InferenceResult &inference,
-                                                      const std_msgs::msg::Header &header,
-                                                      double confidence_threshold, double nms_threshold) {
+                                                      const std_msgs::msg::Header &header, double confidence_threshold,
+                                                      double nms_threshold) {
   vision_msgs::msg::Detection2DArray detections_array;
   detections_array.header = header;
   auto &detections = detections_array.detections;
@@ -170,6 +170,41 @@ vision_msgs::msg::Detection2DArray decode_yolo_output(const InferenceResult &inf
 
 } // namespace
 
+YoloDetectorComponent::Latencies YoloDetectorComponent::measure_latencies(const rclcpp::Time &image_stamp) {
+  const auto callback_start = metrics_clock_->now();
+  const auto image_stamp_ns = image_stamp.nanoseconds();
+  double callback_interval_ms = 0.0;
+  double image_stamp_interval_ms = 0.0;
+  bool had_previous_image = false;
+  int64_t frame_drop_count = 0;
+
+  {
+    std::lock_guard lock(metrics_mutex_);
+    had_previous_image = has_previous_image_;
+    if (had_previous_image) {
+      callback_interval_ms =
+          (callback_start - rclcpp::Time(previous_callback_start_ns_, callback_start.get_clock_type())).seconds() *
+          1000.0;
+      const int64_t stamp_interval_ns = image_stamp_ns - previous_image_stamp_ns_;
+      image_stamp_interval_ms = static_cast<double>(stamp_interval_ns) / 1.0e6;
+      if (stamp_interval_ns > 0) {
+        const auto expected_frames =
+            static_cast<int64_t>(std::llround(static_cast<double>(stamp_interval_ns) * expected_frame_rate_ / 1.0e9));
+        frame_drop_count_ += std::max<int64_t>(0, expected_frames - 1);
+      }
+    }
+    previous_callback_start_ns_ = callback_start.nanoseconds();
+    previous_image_stamp_ns_ = image_stamp_ns;
+    has_previous_image_ = true;
+    frame_drop_count = frame_drop_count_;
+  }
+
+  return {
+      callback_start,          image_stamp_ns,   callback_interval_ms,
+      image_stamp_interval_ms, frame_drop_count, had_previous_image,
+  };
+}
+
 YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
     : Node("yolo_detector_component", options) {
 
@@ -236,40 +271,14 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
     return;
   }
 
-  const auto callback_start = metrics_clock_->now();
-  const auto image_stamp_ns = rclcpp::Time(msg->header.stamp).nanoseconds();
-  double callback_interval_ms = 0.0;
-  double image_stamp_interval_ms = 0.0;
-  int64_t frame_drop_count = 0;
-  bool had_previous_image = false;
+  const auto latencies = measure_latencies(rclcpp::Time(msg->header.stamp));
 
-  // TODO: CONVOLUTED AF: find better solution if possible;
-  {
-    std::lock_guard lock(metrics_mutex_);
-    had_previous_image = has_previous_image_;
-    if (had_previous_image) {
-      callback_interval_ms =
-          (callback_start - rclcpp::Time(previous_callback_start_ns_, callback_start.get_clock_type())).seconds() *
-          1000.0;
-      const int64_t stamp_interval_ns = image_stamp_ns - previous_image_stamp_ns_;
-      image_stamp_interval_ms = static_cast<double>(stamp_interval_ns) / 1.0e6;
-      if (stamp_interval_ns > 0) {
-        const auto expected_frames =
-            static_cast<int64_t>(std::llround(static_cast<double>(stamp_interval_ns) * expected_frame_rate_ / 1.0e9));
-        frame_drop_count_ += std::max<int64_t>(0, expected_frames - 1);
-      }
-    }
-    previous_callback_start_ns_ = callback_start.nanoseconds();
-    previous_image_stamp_ns_ = image_stamp_ns;
-    has_previous_image_ = true;
-    frame_drop_count = frame_drop_count_;
-  }
-
-  if (had_previous_image) {
-    metrics::log_scalar("detector/callback_interval_ms", callback_interval_ms, image_stamp_ns);
+  if (latencies.had_previous_image) {
+    metrics::log_scalar("detector/callback_interval_ms", latencies.callback_interval_ms, latencies.image_stamp_ns);
   }
   // TODO: Replace with just logged frame IDs, don't estimate anything here.
-  metrics::log_scalar("detector/frame_drop_count", static_cast<double>(frame_drop_count), image_stamp_ns);
+  metrics::log_scalar("detector/frame_drop_count", static_cast<double>(latencies.frame_drop_count),
+                      latencies.image_stamp_ns);
 
   try {
     // Model inference: run the incomming image through the YOLO detector
@@ -279,31 +288,30 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
     const auto inference = model_->infer(cv_ptr->image);
     const auto inference_end = metrics_clock_->now();
     const double inference_latency_ms = (inference_end - inference_start).seconds() * 1000.0;
-    metrics::log_scalar("detector/inference_latency_ms", inference_latency_ms, image_stamp_ns);
+    metrics::log_scalar("detector/inference_latency_ms", inference_latency_ms, latencies.image_stamp_ns);
 
     // Decode YOLO detections
     auto detections = decode_yolo_output(inference, msg->header, confidence_threshold_, nms_threshold_);
 
     if (log_input_image_) {
-      metrics::log_encoded_image("camera/image_raw/compressed", msg, image_stamp_ns);
-      metrics::log_detections("detector/detections", detections, kCocoClassNames, image_stamp_ns);
+      metrics::log_encoded_image("camera/image_raw/compressed", msg, latencies.image_stamp_ns);
+      metrics::log_detections("detector/detections", detections, kCocoClassNames, latencies.image_stamp_ns);
     }
 
     RCLCPP_DEBUG(get_logger(), "Decoded %zu detections", detections.detections.size());
-    auto detections_msg =
-        std::make_unique<vision_msgs::msg::Detection2DArray>(std::move(detections));
+    auto detections_msg = std::make_unique<vision_msgs::msg::Detection2DArray>(std::move(detections));
     RCLCPP_DEBUG(get_logger(), "Publishing detections at %p", static_cast<void *>(detections_msg.get()));
     detections_pub_->publish(std::move(detections_msg));
 
     const auto callback_end = metrics_clock_->now();
     const auto image_age = get_clock()->now() - rclcpp::Time(msg->header.stamp, get_clock()->get_clock_type());
 
-    if (had_previous_image) {
+    if (latencies.had_previous_image) {
       RCLCPP_DEBUG_THROTTLE(get_logger(), *get_clock(), 500,
                             "callback_interval=%.1f ms image_stamp_interval=%.1f ms "
                             "inference=%.1f ms callback_duration=%.1f ms image_age=%.1f ms",
-                            callback_interval_ms, image_stamp_interval_ms, inference_latency_ms,
-                            (callback_end - callback_start).seconds() * 1000.0, image_age.seconds() * 1000.0);
+                            latencies.callback_interval_ms, latencies.image_stamp_interval_ms, inference_latency_ms,
+                            (callback_end - latencies.callback_start).seconds() * 1000.0, image_age.seconds() * 1000.0);
     }
 
   } catch (const std::exception &ex) {

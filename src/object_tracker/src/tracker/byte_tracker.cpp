@@ -47,8 +47,8 @@ void ByteTracker::apply_match(Track &track, const Detection &detection) {
   track.last_frame = frame_id_;
 }
 
-void ByteTracker::update(std::span<const Detection> detections, std::vector<TrackedObject> &out,
-                         const rclcpp::Clock &clock, double &association_latency_ms) {
+TrackerUpdateResult ByteTracker::update(std::span<const Detection> detections, const rclcpp::Clock &clock) {
+  TrackerUpdateResult result;
   ++frame_id_;
   int64_t association_time_ns = 0;
 
@@ -150,13 +150,14 @@ void ByteTracker::update(std::span<const Detection> detections, std::vector<Trac
   }
   std::erase_if(tracks_, [](const Track &t) { return t.state == TrackState::kRemoved; });
 
-  out.clear();
   for (const Track &track : tracks_) {
     if (track.state == TrackState::kTracked && track.activated) {
-      out.push_back({track.id, track.box(), track.score, track.class_id, frame_id_ - track.start_frame + 1});
+      result.tracked_objects.push_back({track.id, track.box(), track.score, track.class_id,
+                                        frame_id_ - track.start_frame + 1});
     }
   }
-  association_latency_ms = static_cast<double>(association_time_ns) / 1.0e6;
+  result.association_latency_ms = static_cast<double>(association_time_ns) / 1.0e6;
+  return result;
 }
 
 } // namespace object_tracker

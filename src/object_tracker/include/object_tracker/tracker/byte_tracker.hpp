@@ -19,6 +19,11 @@ struct TrackedObject {
   int age_frames = 0;
 };
 
+struct TrackerUpdateResult {
+  std::vector<TrackedObject> tracked_objects;
+  double association_latency_ms = 0.0;
+};
+
 // Defaults follow Ultralytics' bytetrack.yaml.
 struct ByteTrackerOptions {
   float high_threshold = 0.25f;      // detections above this take part in the first association
@@ -44,9 +49,8 @@ public:
   explicit ByteTracker(ByteTrackerOptions options = {});
 
   // Detections must be in source-image pixels and should include low-score boxes (run the
-  // decoder with score threshold <= low_threshold). Writes confirmed tracks to `out`.
-  void update(std::span<const Detection> detections, std::vector<TrackedObject> &out, const rclcpp::Clock &clock,
-              double &association_latency_ms);
+  // decoder with score threshold <= low_threshold).
+  [[nodiscard]] TrackerUpdateResult update(std::span<const Detection> detections, const rclcpp::Clock &clock);
   void reset();
 
   [[nodiscard]] int frame_index() const noexcept { return frame_id_; }

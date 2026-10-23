@@ -16,7 +16,17 @@ public:
   explicit YoloDetectorComponent(const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
 
 private:
+  struct Latencies {
+    rclcpp::Time callback_start;
+    int64_t image_stamp_ns;
+    double callback_interval_ms = 0.0;
+    double image_stamp_interval_ms = 0.0;
+    int64_t frame_drop_count = 0;
+    bool had_previous_image = false;
+  };
+
   void imageCallback(const sensor_msgs::msg::CompressedImage::ConstSharedPtr msg);
+  Latencies measure_latencies(const rclcpp::Time &image_stamp);
 
   // TODO: WHY shared_ptr here?
   std::shared_ptr<OnnxModel> model_;
