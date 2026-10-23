@@ -103,6 +103,7 @@ target_include_directories(yolo_onnx
   ${OpenCV_INCLUDE_DIRS}
 )
 target_link_libraries(yolo_onnx PUBLIC "${ONNXRUNTIME_LIBRARY}" ${OpenCV_LIBS})
+ament_target_dependencies(yolo_onnx PUBLIC rclcpp)
 
 add_executable(onnx_probe src/detector/onnx_probe.cpp)
 target_link_libraries(onnx_probe PRIVATE yolo_onnx fmt::fmt)

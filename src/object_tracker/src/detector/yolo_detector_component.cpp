@@ -284,11 +284,10 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
     // Model inference: run the incomming image through the YOLO detector
     // TODO: Can we just do w/o the cv_bridge?
     const auto cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
-    const auto inference_start = metrics_clock_->now();
     const auto inference = model_->infer(cv_ptr->image);
-    const auto inference_end = metrics_clock_->now();
-    const double inference_latency_ms = (inference_end - inference_start).seconds() * 1000.0;
-    metrics::log_scalar("detector/inference_latency_ms", inference_latency_ms, latencies.image_stamp_ns);
+    metrics::log_scalar("detector/preprocessing_latency_ms", inference.preprocessing_latency_ms,
+                        latencies.image_stamp_ns);
+    metrics::log_scalar("detector/inference_latency_ms", inference.inference_latency_ms, latencies.image_stamp_ns);
 
     // Decode YOLO detections
     auto detections = decode_yolo_output(inference, msg->header, confidence_threshold_, nms_threshold_);
@@ -309,8 +308,10 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
     if (latencies.had_previous_image) {
       RCLCPP_DEBUG_THROTTLE(get_logger(), *get_clock(), 500,
                             "callback_interval=%.1f ms image_stamp_interval=%.1f ms "
-                            "inference=%.1f ms callback_duration=%.1f ms image_age=%.1f ms",
-                            latencies.callback_interval_ms, latencies.image_stamp_interval_ms, inference_latency_ms,
+                            "preprocessing=%.1f ms inference=%.1f ms callback_duration=%.1f ms image_age=%.1f ms",
+                            latencies.callback_interval_ms, latencies.image_stamp_interval_ms,
+                            inference.preprocessing_latency_ms,
+                            inference.inference_latency_ms,
                             (callback_end - latencies.callback_start).seconds() * 1000.0, image_age.seconds() * 1000.0);
     }
 

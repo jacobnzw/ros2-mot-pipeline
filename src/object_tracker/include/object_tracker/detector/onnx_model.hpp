@@ -15,6 +15,9 @@ struct OutputTensor {
 
 struct InferenceResult {
   std::vector<OutputTensor> outputs;
+  // Durations measured with an RCL_STEADY_TIME clock.
+  double preprocessing_latency_ms{0.0};
+  double inference_latency_ms{0.0};
   float scale{1.0F};
   int pad_left{0};
   int pad_top{0};
@@ -36,9 +39,9 @@ public:
   explicit OnnxModel(const std::string &model_path);
 
   /**
-   * Preprocess one OpenCV BGR image and return output tensors and letterbox metadata.
+   * Preprocess one OpenCV BGR image, run inference, and return outputs, timings, and letterbox metadata.
    * @param bgr_image Input image in OpenCV's usual BGR channel order.
-   * @return Model outputs and geometry needed to map boxes to the source image.
+   * @return Model outputs, preprocessing/inference durations, and geometry needed to map boxes to the source image.
    */
   InferenceResult infer(const cv::Mat &bgr_image);
 

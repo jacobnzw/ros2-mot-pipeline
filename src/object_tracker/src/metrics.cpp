@@ -127,7 +127,7 @@ rclcpp::Clock::SharedPtr create_clock(rclcpp::Node &node) {
   bool use_sim_time = false;
   node.get_parameter_or("use_sim_time", use_sim_time, false);
   if (use_sim_time) {
-    return node.get_clock();
+    return node.get_clock(); // reads from /clock topic when sim time enabled
   }
   return std::make_shared<rclcpp::Clock>(RCL_STEADY_TIME);
 }

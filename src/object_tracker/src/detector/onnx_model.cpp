@@ -3,6 +3,7 @@
 #include <fmt/ranges.h>
 #include <opencv2/dnn/dnn.hpp>
 #include <opencv2/imgproc.hpp>
+#include <rclcpp/clock.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -82,6 +83,8 @@ InferenceResult OnnxModel::infer(const cv::Mat &bgr_image) {
   if (bgr_image.empty()) {
     throw std::invalid_argument("Input image is empty");
   }
+  const rclcpp::Clock steady_clock(RCL_STEADY_TIME);
+  const auto preprocessing_start = steady_clock.now();
 
   // TypeInfo owns model metadata. Keep it alive while using the tensor-shape
   // view returned from it; otherwise that view would refer to released state.
@@ -156,12 +159,16 @@ InferenceResult OnnxModel::infer(const cv::Mat &bgr_image) {
     output_name_pointers.push_back(name.c_str());
   }
 
-  // RUN INFERENCE
+  const auto preprocessing_end = steady_clock.now();
+  const auto inference_start = preprocessing_end;
   const char *input_name = input_name_.c_str();
   auto outputs = session_.Run(Ort::RunOptions{nullptr}, &input_name, &input_tensor, 1, output_name_pointers.data(),
                               output_name_pointers.size());
+  const auto inference_end = steady_clock.now();
 
   InferenceResult result;
+  result.preprocessing_latency_ms = (preprocessing_end - preprocessing_start).seconds() * 1000.0;
+  result.inference_latency_ms = (inference_end - inference_start).seconds() * 1000.0;
   result.scale = scale;
   result.pad_left = left;
   result.pad_top = top;
