@@ -135,6 +135,16 @@ boxes with class IDs and confidence scores over the image.
 To use a system-wide cuDNN installation, set `CUDNN_LIBRARY_DIR` before sourcing the helper. To override the default
 SDK or toolkit locations, set `ONNXRUNTIME_ROOT` or `CUDA_ROOT` first.
 
+To export a one-page PDF with histograms for the detector inference latency, detector and tracker callback intervals,
+and end-to-end pipeline latency, run this from the repository root:
+
+```bash
+uv run scripts/rrd_latency_histogram.py object_tracker.rrd
+```
+
+By default, the PDF is written beside the recording as `object_tracker_latency_histogram.pdf`. Pass `--output path.pdf`
+to choose a different output path.
+
 The probe letterboxes the image, converts it to RGB float values in `[0, 1]`, and runs the model. It reports tensor
 shapes but does not decode detections or apply NMS; those details depend on the ONNX export configuration. `build/`,
 `install/`, and `log/` are ignored by git.
