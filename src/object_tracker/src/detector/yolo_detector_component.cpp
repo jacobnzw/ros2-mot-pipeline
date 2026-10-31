@@ -218,6 +218,7 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
   declare_parameter("nms_threshold", 0.45);
   declare_parameter("expected_frame_rate", 10.0);
   declare_parameter("log_input_image", false);
+  declare_parameter("recording_path", std::string("runs/recording.rrd"));
 
   confidence_threshold_ = get_parameter("confidence_threshold").as_double();
   nms_threshold_ = get_parameter("nms_threshold").as_double();
@@ -232,7 +233,7 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
   }
 
   steady_clock_ = std::make_shared<rclcpp::Clock>(RCL_STEADY_TIME);
-  metrics::initialize_rerun();
+  metrics::initialize_rerun(get_parameter("recording_path").as_string());
 
   const auto model_path = get_parameter("model_path").as_string();
   if (model_path.empty()) {

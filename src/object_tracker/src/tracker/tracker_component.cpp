@@ -20,6 +20,7 @@ TrackerComponent::TrackerComponent(const rclcpp::NodeOptions &options) : Node("t
   declare_parameter("track_buffer", 10);          // frames a lost track is kept for re-identification
   declare_parameter("frame_rate", 10.0);
   declare_parameter("fuse_score", true);
+  declare_parameter("recording_path", std::string("runs/recording.rrd"));
 
   ByteTrackerOptions tracker_options;
   tracker_options.high_threshold = static_cast<float>(get_parameter("high_threshold").as_double());
@@ -37,7 +38,7 @@ TrackerComponent::TrackerComponent(const rclcpp::NodeOptions &options) : Node("t
 
   tracker_ = ByteTracker(tracker_options);
   metrics_clock_ = metrics::create_clock(*this);
-  metrics::initialize_rerun();
+  metrics::initialize_rerun(get_parameter("recording_path").as_string());
 
   // SUBSCRIPTION for detection messages
   // Separate callback group to allow parallel execution with detector component in MultiThreaded executor

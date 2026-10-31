@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import ComposableNodeContainer
@@ -8,6 +10,7 @@ from launch import LaunchDescription, LaunchContext
 log_level = LaunchConfiguration("log_level")
 log_input_image = LaunchConfiguration("log_input_image")
 thread_num = LaunchConfiguration("thread_num")
+recording_path = LaunchConfiguration("recording_path")
 
 
 def generate_launch_description():
@@ -31,6 +34,7 @@ def generate_launch_description():
                     "image_topic": "/camera/image_raw/compressed",
                     "detection_topic": "/detections",
                     "log_input_image": log_input_image,
+                    "recording_path": recording_path,
                 }
             ],
             extra_arguments=[{"use_intra_process_comms": True}],
@@ -52,6 +56,7 @@ def generate_launch_description():
                     "track_buffer": 10,  # frames a lost track is kept for re-identification
                     "frame_rate": 10.0,
                     "fuse_score": True,
+                    "recording_path": recording_path,
                 }
             ],
             extra_arguments=[{"use_intra_process_comms": True}],
@@ -98,6 +103,13 @@ def generate_launch_description():
                 "thread_num",
                 default_value="1",
                 description="Number of threads to use. If > 1 multi-threaded executor is used.",
+            ),
+            DeclareLaunchArgument(
+                "recording_path",
+                default_value=(
+                    f"runs/{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}_yolo11n_kitti-0019/recording.rrd"
+                ),
+                description="Path for the Rerun recording. The parent directory is created automatically.",
             ),
             kitty_player,
             OpaqueFunction(function=create_tracker_container),

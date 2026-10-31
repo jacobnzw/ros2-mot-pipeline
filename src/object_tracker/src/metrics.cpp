@@ -8,6 +8,7 @@
 #include <cctype>
 #include <charconv>
 #include <cmath>
+#include <filesystem>
 #include <mutex>
 #include <stdexcept>
 #include <string>
@@ -26,17 +27,38 @@ rerun::RecordingStream &recording_stream() {
 
 } // namespace
 
-// TODO: make the out file path configurable
-void initialize_rerun() {
-  static std::once_flag initialized;
-  std::call_once(initialized, [] {
-    auto &stream = recording_stream();
-    const auto sink_error = stream.set_sinks(rerun::FileSink{"object_tracker.rrd"});
-    if (sink_error.is_err()) {
-      throw std::runtime_error("Failed to configure Rerun output: " + sink_error.description);
+void initialize_rerun(const std::filesystem::path &recording_path) {
+  if (recording_path.empty()) {
+    throw std::invalid_argument("Rerun recording path must not be empty");
+  }
+
+  const auto absolute_path = std::filesystem::absolute(recording_path).lexically_normal();
+  static std::mutex initialization_mutex;
+  static std::filesystem::path initialized_path;
+  static bool initialized = false;
+  std::lock_guard lock(initialization_mutex);
+  if (initialized) {
+    if (absolute_path != initialized_path) {
+      throw std::invalid_argument("Rerun recording path must match across pipeline components: " +
+                                  initialized_path.string() + " != " + absolute_path.string());
     }
-    stream.set_global();
-  });
+    return;
+  }
+
+  const auto parent_path = absolute_path.parent_path();
+  if (!parent_path.empty()) {
+    std::filesystem::create_directories(parent_path);
+  }
+
+  auto &stream = recording_stream();
+  const auto sink_error = stream.set_sinks(rerun::FileSink{absolute_path.string()});
+  if (sink_error.is_err()) {
+    throw std::runtime_error("Failed to configure Rerun output at '" + absolute_path.string() +
+                             "': " + sink_error.description);
+  }
+  stream.set_global();
+  initialized_path = absolute_path;
+  initialized = true;
 }
 
 void log_scalar(std::string_view entity_path, double value, int64_t ros_timestamp_ns) {
