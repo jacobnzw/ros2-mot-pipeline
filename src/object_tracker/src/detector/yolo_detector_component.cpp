@@ -171,7 +171,7 @@ vision_msgs::msg::Detection2DArray decode_yolo_output(const InferenceResult &inf
 } // namespace
 
 YoloDetectorComponent::Latencies YoloDetectorComponent::measure_latencies(const rclcpp::Time &image_stamp) {
-  const auto callback_start = metrics_clock_->now();
+  const auto callback_start = steady_clock_->now();
   const auto image_stamp_ns = image_stamp.nanoseconds();
   double callback_interval_ms = 0.0;
   double image_stamp_interval_ms = 0.0;
@@ -231,7 +231,7 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
     throw std::invalid_argument("expected_frame_rate must be finite and greater than zero");
   }
 
-  metrics_clock_ = metrics::create_clock(*this);
+  steady_clock_ = std::make_shared<rclcpp::Clock>(RCL_STEADY_TIME);
   metrics::initialize_rerun();
 
   const auto model_path = get_parameter("model_path").as_string();
@@ -276,7 +276,6 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
   if (latencies.had_previous_image) {
     metrics::log_scalar("detector/callback_interval_ms", latencies.callback_interval_ms, latencies.image_stamp_ns);
   }
-  // TODO: Replace with just logged frame IDs, don't estimate anything here.
   metrics::log_scalar("detector/frame_drop_count", static_cast<double>(latencies.frame_drop_count),
                       latencies.image_stamp_ns);
 
@@ -285,34 +284,37 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
     // TODO: Can we just do w/o the cv_bridge?
     const auto cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
     const auto inference = model_->infer(cv_ptr->image);
-    metrics::log_scalar("detector/preprocessing_latency_ms", inference.preprocessing_latency_ms,
-                        latencies.image_stamp_ns);
-    metrics::log_scalar("detector/inference_latency_ms", inference.inference_latency_ms, latencies.image_stamp_ns);
 
     // Decode YOLO detections
     auto detections = decode_yolo_output(inference, msg->header, confidence_threshold_, nms_threshold_);
-
-    if (log_input_image_) {
-      metrics::log_encoded_image("camera/image_raw/compressed", msg, latencies.image_stamp_ns);
-      metrics::log_detections("detector/detections", detections, kCocoClassNames, latencies.image_stamp_ns);
-    }
-
     RCLCPP_DEBUG(get_logger(), "Decoded %zu detections", detections.detections.size());
+
+    // Publish detections
     auto detections_msg = std::make_unique<vision_msgs::msg::Detection2DArray>(std::move(detections));
     RCLCPP_DEBUG(get_logger(), "Publishing detections at %p", static_cast<void *>(detections_msg.get()));
     detections_pub_->publish(std::move(detections_msg));
 
-    const auto callback_end = metrics_clock_->now();
-    const auto image_age = get_clock()->now() - rclcpp::Time(msg->header.stamp, get_clock()->get_clock_type());
+    const auto image_age_ms =
+        (get_clock()->now() - rclcpp::Time(msg->header.stamp, get_clock()->get_clock_type())).seconds() * 1000.0;
+    const auto callback_duration_ms = (steady_clock_->now() - latencies.callback_start).seconds() * 1000.0;
+
+    // Log latencies & (conditionally) images w/ detections
+    metrics::log_scalar("detector/callback_duration_ms", callback_duration_ms, latencies.image_stamp_ns);
+    metrics::log_scalar("detector/preprocessing_latency_ms", inference.preprocessing_latency_ms,
+                        latencies.image_stamp_ns);
+    metrics::log_scalar("detector/inference_latency_ms", inference.inference_latency_ms, latencies.image_stamp_ns);
+    if (log_input_image_) {
+      metrics::log_encoded_image("camera/image_raw/compressed", msg, latencies.image_stamp_ns);
+      metrics::log_detections("detector/detections", detections, kCocoClassNames, latencies.image_stamp_ns);
+    }
 
     if (latencies.had_previous_image) {
       RCLCPP_DEBUG_THROTTLE(get_logger(), *get_clock(), 500,
                             "callback_interval=%.1f ms image_stamp_interval=%.1f ms "
                             "preprocessing=%.1f ms inference=%.1f ms callback_duration=%.1f ms image_age=%.1f ms",
                             latencies.callback_interval_ms, latencies.image_stamp_interval_ms,
-                            inference.preprocessing_latency_ms,
-                            inference.inference_latency_ms,
-                            (callback_end - latencies.callback_start).seconds() * 1000.0, image_age.seconds() * 1000.0);
+                            inference.preprocessing_latency_ms, inference.inference_latency_ms, callback_duration_ms,
+                            image_age_ms);
     }
 
   } catch (const std::exception &ex) {

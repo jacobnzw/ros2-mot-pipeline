@@ -37,7 +37,7 @@ private:
   bool log_input_image_{false};
 
   // TODO: move to metrics possible?
-  rclcpp::Clock::SharedPtr metrics_clock_;
+  rclcpp::Clock::SharedPtr steady_clock_;
   std::mutex metrics_mutex_;
 
   bool has_previous_image_{false};
