@@ -13,6 +13,7 @@ build/
 install/
 log/
 /runs/
+*.rrd
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

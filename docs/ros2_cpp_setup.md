@@ -128,10 +128,26 @@ recording path, pass the `recording_path` launch argument; its parent directory 
 detector inference and callback intervals, estimated cumulative frame drops, ByteTrack association latency and
 active-track count, and image-stamp-to-tracker-output latency. Frame-drop estimates use the detector's
 `expected_frame_rate` parameter and the tracker's `frame_rate` parameter. Each metric is indexed by the input message
-timestamp on the `ros_timestamp` timeline so it can be aligned with the input images. Set the detector's
+timestamp on the `ros2_timestamp` timeline so it can be aligned with the input images. Set the detector's
 `log_input_image` parameter to `true` to include each compressed input frame in the same recording as the metrics.
 This is disabled by default; enabling it duplicates image data and increases the RRD file size. When enabled, the
 detector also logs its decoded bounding boxes with class IDs and confidence scores over the image.
+
+To export latency, duration, and callback-interval scalar samples as CSV rows for VictoriaMetrics, run:
+
+```bash
+uv run scripts/rrd_to_csv.py runs/<run-id>/recording.rrd
+```
+
+By default, this writes `latency.csv` beside the recording. Each row has the columns
+`timestamp_ms,run,stage,value` with no header, ready for a VictoriaMetrics CSV import format such as
+`1:time:unix_ms,2:label:run,3:label:stage,4:metric:latency_ms`. The run label defaults to the run directory name;
+pass `--run-id` to override it. The stage label comes from the Rerun entity path (for example,
+`/detector/inference_latency_ms` becomes `detector_inference`). Counters and other non-duration scalars are omitted.
+
+The exporter preserves ROS timestamps that look like Unix epoch time (2000 or later). Relative or simulated ROS
+timestamps are shifted so the final sample is at export time, preserving the spacing between samples and making the
+recording visible in Grafana's current time range.
 
 To use a system-wide cuDNN installation, set `CUDNN_LIBRARY_DIR` before sourcing the helper. To override the default
 SDK or toolkit locations, set `ONNXRUNTIME_ROOT` or `CUDA_ROOT` first.
