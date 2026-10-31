@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: ROS 2 latency
+    orgId: 1
+    folder: ROS 2 analysis
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards

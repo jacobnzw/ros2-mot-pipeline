@@ -133,21 +133,34 @@ timestamp on the `ros2_timestamp` timeline so it can be aligned with the input i
 This is disabled by default; enabling it duplicates image data and increases the RRD file size. When enabled, the
 detector also logs its decoded bounding boxes with class IDs and confidence scores over the image.
 
-To export latency, duration, and callback-interval scalar samples as CSV rows for VictoriaMetrics, run:
+To export latency, duration, and callback-interval scalar samples to VictoriaMetrics and open Grafana, run:
 
 ```bash
-uv run scripts/rrd_to_csv.py runs/<run-id>/recording.rrd
+scripts/analyse.sh runs/<run-id>/recording.rrd
 ```
 
-By default, this writes `latency.csv` beside the recording. Each row has the columns
-`timestamp_ms,run,stage,value` with no header, ready for a VictoriaMetrics CSV import format such as
-`1:time:unix_ms,2:label:run,3:label:stage,4:metric:latency_ms`. The run label defaults to the run directory name;
-pass `--run-id` to override it. The stage label comes from the Rerun entity path (for example,
-`/detector/inference_latency_ms` becomes `detector_inference`). Counters and other non-duration scalars are omitted.
+The script writes `latency.csv` beside the recording, starts the Compose services, waits for them to respond, and imports
+the samples into VictoriaMetrics. Each CSV row has the columns `timestamp_ms,run,stage,value` with no header and is
+imported with `1:time:unix_ms,2:label:run,3:label:stage,4:metric:latency_ms`. The run label defaults to the run
+directory name; pass an optional second argument to `analyse.sh` to override it. The stage label comes from the Rerun
+entity path (for example, `/detector/inference_latency_ms` becomes `detector_inference`). Counters and other
+non-duration scalars are omitted. You can also run `uv run scripts/rrd_to_csv.py runs/<run-id>/recording.rrd` to
+export only the CSV.
 
 The exporter preserves ROS timestamps that look like Unix epoch time (2000 or later). Relative or simulated ROS
 timestamps are shifted so the final sample is at export time, preserving the spacing between samples and making the
 recording visible in Grafana's current time range.
+
+The Compose stack uses VictoriaMetrics v1.155.0 and Grafana 12.0.0. The VictoriaMetrics image is pulled on first startup.
+The provisioned `ROS 2 Latency Analysis` dashboard includes a detector-inference heatmap (5-second X buckets and 25
+latency buckets), rolling 5-second p50/p95/p99 inference latency, and an overall histogram for a selectable stage.
+Select the imported run in the dashboard's `Run` variable; the `Stage` variable controls the histogram panel. The
+Prometheus data source uses a 100 ms minimum query interval to retain approximately the original 10 Hz sample
+resolution for the heatmap and histogram.
+
+VictoriaMetrics data and Grafana state persist in Docker named volumes across container restarts. VictoriaMetrics
+retains data for 31 days. Services bind to localhost only; Grafana's initial local credentials are `admin` / `admin`.
+Change the password in Grafana after the first login. `docker compose down -v` deletes the persisted data.
 
 To use a system-wide cuDNN installation, set `CUDNN_LIBRARY_DIR` before sourcing the helper. To override the default
 SDK or toolkit locations, set `ONNXRUNTIME_ROOT` or `CUDA_ROOT` first.
