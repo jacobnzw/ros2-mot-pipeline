@@ -133,7 +133,10 @@ timestamp on the `ros2_timestamp` timeline so it can be aligned with the input i
 `log_input_image` parameter to `true` to include each compressed input frame in the same recording as the metrics. This
 is disabled by default; enabling it duplicates image data and increases the RRD file size. When enabled, the detector
 also logs its decoded bounding boxes with class IDs and confidence scores over the image. Tracker callback interval and
-ByteTrack association duration are measured with a steady clock, independently of ROS simulated time.
+ByteTrack association duration are measured with a steady clock, independently of ROS simulated time. Every Rerun log
+event is indexed on both `ros2_timestamp` (message/header time) and `steady_elapsed` (elapsed monotonic time since
+recording initialization). This preserves source-frame alignment while giving looped MCAP replays a non-repeating time
+axis. The same event is logged once with both timeline coordinates.
 
 To export latency, duration, and callback-interval scalar samples to VictoriaMetrics and open Grafana, run:
 
@@ -149,9 +152,9 @@ entity path (for example, `/detector/inference_latency_ms` becomes `detector_inf
 non-duration scalars are omitted. You can also run `uv run scripts/rrd_to_csv.py runs/<run-id>/recording.rrd` to export
 only the CSV.
 
-The exporter preserves ROS timestamps that look like Unix epoch time (2000 or later). Relative or simulated ROS
-timestamps are shifted so the final sample is at export time, preserving the spacing between samples and making the
-recording visible in Grafana's current time range.
+The exporter uses `steady_elapsed` when present, falling back to `ros2_timestamp` for older recordings. It maps elapsed
+time so the final sample is at export time, preserving the spacing between samples and making the recording visible in
+Grafana's current time range.
 
 The Compose stack uses VictoriaMetrics v1.155.0 and Grafana 12.0.0. The VictoriaMetrics image is pulled on first
 startup. The provisioned `ROS 2 Latency Analysis` dashboard includes a detector-inference heatmap (5-second X buckets

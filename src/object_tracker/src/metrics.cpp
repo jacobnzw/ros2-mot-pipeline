@@ -25,6 +25,22 @@ rerun::RecordingStream &recording_stream() {
   return stream;
 }
 
+const rclcpp::Clock &steady_clock() {
+  static const rclcpp::Clock clock(RCL_STEADY_TIME);
+  return clock;
+}
+
+int64_t steady_elapsed_origin_ns() {
+  static const int64_t origin_ns = steady_clock().now().nanoseconds();
+  return origin_ns;
+}
+
+void set_timeline_timestamps(rerun::RecordingStream &stream, int64_t ros_timestamp_ns) {
+  const auto elapsed_ns = steady_clock().now().nanoseconds() - steady_elapsed_origin_ns();
+  stream.set_time_duration_nanos("steady_elapsed", elapsed_ns);
+  stream.set_time_timestamp_nanos_since_epoch("ros2_timestamp", ros_timestamp_ns);
+}
+
 } // namespace
 
 void initialize_rerun(const std::filesystem::path &recording_path) {
@@ -57,20 +73,21 @@ void initialize_rerun(const std::filesystem::path &recording_path) {
                              "': " + sink_error.description);
   }
   stream.set_global();
+  steady_elapsed_origin_ns();
   initialized_path = absolute_path;
   initialized = true;
 }
 
 void log_scalar(std::string_view entity_path, double value, int64_t ros_timestamp_ns) {
   auto &stream = rerun::RecordingStream::current();
-  stream.set_time_timestamp_nanos_since_epoch("ros2_timestamp", ros_timestamp_ns);
+  set_timeline_timestamps(stream, ros_timestamp_ns);
   stream.log(entity_path, rerun::Scalars(value));
 }
 
 void log_encoded_image(std::string_view entity_path, const sensor_msgs::msg::CompressedImage::ConstSharedPtr msg,
                        int64_t ros_timestamp_ns) {
   auto &stream = rerun::RecordingStream::current();
-  stream.set_time_timestamp_nanos_since_epoch("ros2_timestamp", ros_timestamp_ns);
+  set_timeline_timestamps(stream, ros_timestamp_ns);
 
   const auto &image_data = msg->data;
   if (image_data.empty()) {
@@ -97,7 +114,7 @@ void log_encoded_image(std::string_view entity_path, const sensor_msgs::msg::Com
 void log_detections(std::string_view entity_path, const vision_msgs::msg::Detection2DArray &detections,
                     std::span<const char *const> class_names, int64_t ros_timestamp_ns) {
   auto &stream = rerun::RecordingStream::current();
-  stream.set_time_timestamp_nanos_since_epoch("ros2_timestamp", ros_timestamp_ns);
+  set_timeline_timestamps(stream, ros_timestamp_ns);
 
   if (detections.detections.empty()) {
     stream.log(entity_path, rerun::Clear::FLAT);

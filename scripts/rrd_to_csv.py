@@ -12,6 +12,7 @@ import rerun_bindings
 
 SCALAR_COMPONENT = "Scalars:scalars"
 ROS2_TIMESTAMP_COLUMN = "ros2_timestamp"
+STEADY_ELAPSED_COLUMN = "steady_elapsed"
 EARLIEST_EXPECTED_UNIX_TIMESTAMP_MS = 946_684_800_000
 
 
@@ -32,6 +33,14 @@ def stage_from_entity_path(entity_path: str) -> str | None:
     return None
 
 
+def select_timestamp_column(column_names: list[str]) -> str:
+    if STEADY_ELAPSED_COLUMN in column_names:
+        return STEADY_ELAPSED_COLUMN
+    if ROS2_TIMESTAMP_COLUMN in column_names:
+        return ROS2_TIMESTAMP_COLUMN
+    raise ValueError("scalar chunk has no supported time timeline")
+
+
 def read_latency_samples(recording_path: Path) -> list[Sample]:
     reader = rerun_bindings.RrdReaderInternal(str(recording_path))
     stream = rr.chunk.LazyChunkStream(reader.stream()).filter(components=SCALAR_COMPONENT)
@@ -43,10 +52,8 @@ def read_latency_samples(recording_path: Path) -> list[Sample]:
             continue
 
         batch = chunk.to_record_batch()
-        if ROS2_TIMESTAMP_COLUMN not in batch.schema.names:
-            raise ValueError(f"{chunk.entity_path} has scalar values but no {ROS2_TIMESTAMP_COLUMN} timeline")
-
-        timestamps = batch.column(ROS2_TIMESTAMP_COLUMN)
+        timeline_column = select_timestamp_column(batch.schema.names)
+        timestamps = batch.column(timeline_column)
         values = batch.column(SCALAR_COMPONENT)
         for row_index in range(batch.num_rows):
             timestamp = timestamps[row_index]

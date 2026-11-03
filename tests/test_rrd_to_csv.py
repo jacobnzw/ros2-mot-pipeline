@@ -3,7 +3,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.rrd_to_csv import Sample, stage_from_entity_path, timestamp_to_unix_ms, write_csv
+from scripts.rrd_to_csv import (
+    ROS2_TIMESTAMP_COLUMN,
+    STEADY_ELAPSED_COLUMN,
+    Sample,
+    select_timestamp_column,
+    stage_from_entity_path,
+    timestamp_to_unix_ms,
+    write_csv,
+)
 
 
 class RrdToCsvTests(unittest.TestCase):
@@ -13,6 +21,15 @@ class RrdToCsvTests(unittest.TestCase):
         self.assertEqual(stage_from_entity_path("/tracker/callback_interval_ms"), "tracker_callback_interval")
         self.assertIsNone(stage_from_entity_path("/detector/frame_drop_count"))
         self.assertIsNone(stage_from_entity_path("/tracker/active_tracks"))
+
+    def test_export_prefers_steady_elapsed_and_falls_back_to_ros_timeline(self) -> None:
+        self.assertEqual(
+            select_timestamp_column([ROS2_TIMESTAMP_COLUMN, STEADY_ELAPSED_COLUMN]),
+            STEADY_ELAPSED_COLUMN,
+        )
+        self.assertEqual(select_timestamp_column([ROS2_TIMESTAMP_COLUMN]), ROS2_TIMESTAMP_COLUMN)
+        with self.assertRaisesRegex(ValueError, "no supported time timeline"):
+            select_timestamp_column(["log_time"])
 
     def test_relative_ros_time_is_anchored_to_export_time(self) -> None:
         self.assertEqual(timestamp_to_unix_ms(100_000_000, 100_000_000, 2_100_000_000, 1_000_000), 998_000)

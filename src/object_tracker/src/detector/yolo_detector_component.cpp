@@ -282,7 +282,7 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
 
   try {
     // Model inference: run the incomming image through the YOLO detector
-    // TODO: Can we just do w/o the cv_bridge?
+    // TODO: Can we just do w/o the cv_bridge? Move to infer()
     const auto cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
     const auto inference = model_->infer(cv_ptr->image);
 
