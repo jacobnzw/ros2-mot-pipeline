@@ -18,6 +18,5 @@ void log_encoded_image(std::string_view entity_path, const sensor_msgs::msg::Com
                        int64_t ros_timestamp_ns);
 void log_detections(std::string_view entity_path, const vision_msgs::msg::Detection2DArray &detections,
                     std::span<const char *const> class_names, int64_t ros_timestamp_ns);
-rclcpp::Clock::SharedPtr create_clock(rclcpp::Node &node);
 
 } // namespace object_tracker::metrics

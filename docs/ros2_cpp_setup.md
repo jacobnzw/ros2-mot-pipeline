@@ -1,7 +1,8 @@
 # ROS 2 C++ Setup
 
-The `src/object_tracker` package uses `ament_cmake` and `colcon`. OpenCV is provided by Ubuntu/ROS packages. ONNX Runtime
-C++ is installed separately because the Python `onnxruntime` dependency does not provide its C++ headers and libraries.
+The `src/object_tracker` package uses `ament_cmake` and `colcon`. OpenCV is provided by Ubuntu/ROS packages. ONNX
+Runtime C++ is installed separately because the Python `onnxruntime` dependency does not provide its C++ headers and
+libraries.
 
 ## System dependencies
 
@@ -118,20 +119,21 @@ source scripts/ros2_env.zsh
 ros2 launch launch/detector_foxglove_test.launch.py
 ```
 
-The C++ SDK fetched by CMake writes Rerun data, but does not install the standalone Rerun viewer/CLI.
-Install the viewer separately, for example with `uv tool install rerun-sdk` (see the
-[Rerun viewer installation guide](https://rerun.io/docs/getting-started/install-rerun/viewer)).
-After running the detector and tracker, their scalar metrics are written to a unique run directory under `runs/`, for
-example `runs/20261031T192717123456Z_yolo11n_kitti-0019/recording.rrd`. Open the resulting file with
+The C++ SDK fetched by CMake writes Rerun data, but does not install the standalone Rerun viewer/CLI. Install the viewer
+separately, for example with `uv tool install rerun-sdk` (see the
+[Rerun viewer installation guide](https://rerun.io/docs/getting-started/install-rerun/viewer)). After running the
+detector and tracker, their scalar metrics are written to a unique run directory under `runs/`, for example
+`runs/20261031T192717123456Z_yolo11n_kitti-0019/recording.rrd`. Open the resulting file with
 `rerun runs/<run-id>/recording.rrd`. The launch files create this run directory automatically. To choose a specific
-recording path, pass the `recording_path` launch argument; its parent directory is created automatically. The recording includes
-detector inference and callback intervals, estimated cumulative frame drops, ByteTrack association latency and
+recording path, pass the `recording_path` launch argument; its parent directory is created automatically. The recording
+includes detector inference and callback intervals, estimated cumulative frame drops, ByteTrack association latency and
 active-track count, and image-stamp-to-tracker-output latency. Frame-drop estimates use the detector's
 `expected_frame_rate` parameter and the tracker's `frame_rate` parameter. Each metric is indexed by the input message
 timestamp on the `ros2_timestamp` timeline so it can be aligned with the input images. Set the detector's
-`log_input_image` parameter to `true` to include each compressed input frame in the same recording as the metrics.
-This is disabled by default; enabling it duplicates image data and increases the RRD file size. When enabled, the
-detector also logs its decoded bounding boxes with class IDs and confidence scores over the image.
+`log_input_image` parameter to `true` to include each compressed input frame in the same recording as the metrics. This
+is disabled by default; enabling it duplicates image data and increases the RRD file size. When enabled, the detector
+also logs its decoded bounding boxes with class IDs and confidence scores over the image. Tracker callback interval and
+ByteTrack association duration are measured with a steady clock, independently of ROS simulated time.
 
 To export latency, duration, and callback-interval scalar samples to VictoriaMetrics and open Grafana, run:
 
@@ -139,31 +141,33 @@ To export latency, duration, and callback-interval scalar samples to VictoriaMet
 scripts/analyse.sh runs/<run-id>/recording.rrd
 ```
 
-The script writes `latency.csv` beside the recording, starts the Compose services, waits for them to respond, and imports
-the samples into VictoriaMetrics. Each CSV row has the columns `timestamp_ms,run,stage,value` with no header and is
-imported with `1:time:unix_ms,2:label:run,3:label:stage,4:metric:latency_ms`. The run label defaults to the run
+The script writes `latency.csv` beside the recording, starts the Compose services, waits for them to respond, and
+imports the samples into VictoriaMetrics. Each CSV row has the columns `timestamp_ms,run,stage,value` with no header and
+is imported with `1:time:unix_ms,2:label:run,3:label:stage,4:metric:latency_ms`. The run label defaults to the run
 directory name; pass an optional second argument to `analyse.sh` to override it. The stage label comes from the Rerun
 entity path (for example, `/detector/inference_latency_ms` becomes `detector_inference`). Counters and other
-non-duration scalars are omitted. You can also run `uv run scripts/rrd_to_csv.py runs/<run-id>/recording.rrd` to
-export only the CSV.
+non-duration scalars are omitted. You can also run `uv run scripts/rrd_to_csv.py runs/<run-id>/recording.rrd` to export
+only the CSV.
 
 The exporter preserves ROS timestamps that look like Unix epoch time (2000 or later). Relative or simulated ROS
 timestamps are shifted so the final sample is at export time, preserving the spacing between samples and making the
 recording visible in Grafana's current time range.
 
-The Compose stack uses VictoriaMetrics v1.155.0 and Grafana 12.0.0. The VictoriaMetrics image is pulled on first startup.
-The provisioned `ROS 2 Latency Analysis` dashboard includes a detector-inference heatmap (5-second X buckets and 25
-latency buckets), rolling 5-second p50/p95/p99 inference latency, and an overall histogram for a selectable stage.
-Select the imported run in the dashboard's `Run` variable; the `Stage` variable controls the histogram panel. The
-Prometheus data source uses a 100 ms minimum query interval to retain approximately the original 10 Hz sample
-resolution for the heatmap and histogram.
+The Compose stack uses VictoriaMetrics v1.155.0 and Grafana 12.0.0. The VictoriaMetrics image is pulled on first
+startup. The provisioned `ROS 2 Latency Analysis` dashboard includes a detector-inference heatmap (5-second X buckets
+and 25 latency buckets), rolling 5-second p50/p95/p99 inference latency, and an overall histogram for a selectable
+stage. Select the imported run in the dashboard's `Run` variable; the `Stage` variable controls the histogram panel. The
+Prometheus data source uses a 100 ms minimum query interval to retain approximately the original 10 Hz sample resolution
+for the heatmap and histogram.
 
 VictoriaMetrics data and Grafana state persist in Docker named volumes across container restarts. VictoriaMetrics
 retains data for 31 days. Services bind to localhost only; Grafana's initial local credentials are `admin` / `admin`.
-Change the password in Grafana after the first login. `docker compose down -v` deletes the persisted data.
+Change the password in Grafana after the first login; the updated credentials are saved in Grafana's Docker named volume.
+`docker compose down -v` deletes the persisted data, including the saved credentials.
 
-To use a system-wide cuDNN installation, set `CUDNN_LIBRARY_DIR` before sourcing the helper. To override the default
-SDK or toolkit locations, set `ONNXRUNTIME_ROOT` or `CUDA_ROOT` first.
+
+To use a system-wide cuDNN installation, set `CUDNN_LIBRARY_DIR` before sourcing the helper. To override the default SDK
+or toolkit locations, set `ONNXRUNTIME_ROOT` or `CUDA_ROOT` first.
 
 To export a one-page PDF with histograms for the detector inference latency, detector and tracker callback intervals,
 and end-to-end pipeline latency, run this from the repository root:

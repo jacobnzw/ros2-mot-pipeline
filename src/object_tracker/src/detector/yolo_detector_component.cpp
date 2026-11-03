@@ -271,7 +271,7 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
     RCLCPP_FATAL_THROTTLE(get_logger(), *get_clock(), 5000, "Detector model is not loaded.");
     return;
   }
-
+  // TODO: if use_sim_time=True rclcpp::Time(msg->header.stamp) otherwise steady_clock_->now()
   const auto latencies = measure_latencies(rclcpp::Time(msg->header.stamp));
 
   if (latencies.had_previous_image) {

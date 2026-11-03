@@ -32,7 +32,7 @@ private:
 
   ByteTracker tracker_;
 
-  rclcpp::Clock::SharedPtr metrics_clock_;
+  rclcpp::Clock::SharedPtr steady_clock_;
   std::mutex metrics_mutex_;
 
   double expected_frame_rate_{10.0};

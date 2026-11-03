@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <stdexcept>
 
 namespace object_tracker {
@@ -37,7 +38,7 @@ TrackerComponent::TrackerComponent(const rclcpp::NodeOptions &options) : Node("t
   }
 
   tracker_ = ByteTracker(tracker_options);
-  metrics_clock_ = metrics::create_clock(*this);
+  steady_clock_ = std::make_shared<rclcpp::Clock>(RCL_STEADY_TIME);
   metrics::initialize_rerun(get_parameter("recording_path").as_string());
 
   // SUBSCRIPTION for detection messages
@@ -69,7 +70,7 @@ void TrackerComponent::detectionsCallback(const vision_msgs::msg::Detection2DArr
 
   auto detections = convert(*msg);
 
-  const auto tracker_result = tracker_.update(detections, *metrics_clock_);
+  const auto tracker_result = tracker_.update(detections, *steady_clock_);
   metrics::log_scalar("tracker/association_latency_ms", tracker_result.association_latency_ms,
                       latencies.detections_stamp_ns);
   metrics::log_scalar("tracker/active_tracks", static_cast<double>(tracker_result.tracked_objects.size()),
@@ -83,7 +84,7 @@ void TrackerComponent::detectionsCallback(const vision_msgs::msg::Detection2DArr
 }
 
 TrackerComponent::Latencies TrackerComponent::measure_latencies(const rclcpp::Time &detections_stamp) {
-  const auto callback_start = metrics_clock_->now();
+  const auto callback_start = steady_clock_->now();
   const int64_t detections_stamp_ns = detections_stamp.nanoseconds();
   double callback_interval_ms = 0.0;
   int64_t frame_drop_count = 0;
