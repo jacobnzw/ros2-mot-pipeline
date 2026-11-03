@@ -119,6 +119,15 @@ source scripts/ros2_env.zsh
 ros2 launch launch/detector_foxglove_test.launch.py
 ```
 
+For repeated MCAP playback with the detector/tracker test launch, enable its `loop` argument: (optionally combined with
+a set process `timeout`)
+
+```bash
+timeout 10m ros2 launch launch/detector_test.launch.py loop:=true
+```
+
+Playback then continues indefinitely; stop it with Ctrl+C. The default `loop:=false` plays the bag once.
+
 The C++ SDK fetched by CMake writes Rerun data, but does not install the standalone Rerun viewer/CLI. Install the viewer
 separately, for example with `uv tool install rerun-sdk` (see the
 [Rerun viewer installation guide](https://rerun.io/docs/getting-started/install-rerun/viewer)). After running the
@@ -165,8 +174,8 @@ for the heatmap and histogram.
 
 VictoriaMetrics data and Grafana state persist in Docker named volumes across container restarts. VictoriaMetrics
 retains data for 31 days. Services bind to localhost only; Grafana's initial local credentials are `admin` / `admin`.
-Change the password in Grafana after the first login; the updated credentials are saved in Grafana's Docker named volume.
-`docker compose down -v` deletes the persisted data, including the saved credentials.
+Change the password in Grafana after the first login; the updated credentials are saved in Grafana's Docker named
+volume. `docker compose down -v` deletes the persisted data, including the saved credentials.
 
 
 To use a system-wide cuDNN installation, set `CUDNN_LIBRARY_DIR` before sourcing the helper. To override the default SDK
