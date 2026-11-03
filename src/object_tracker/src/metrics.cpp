@@ -8,6 +8,7 @@
 #include <cctype>
 #include <charconv>
 #include <cmath>
+#include <filesystem>
 #include <mutex>
 #include <stdexcept>
 #include <string>
@@ -24,31 +25,69 @@ rerun::RecordingStream &recording_stream() {
   return stream;
 }
 
+const rclcpp::Clock &steady_clock() {
+  static const rclcpp::Clock clock(RCL_STEADY_TIME);
+  return clock;
+}
+
+int64_t steady_elapsed_origin_ns() {
+  static const int64_t origin_ns = steady_clock().now().nanoseconds();
+  return origin_ns;
+}
+
+void set_timeline_timestamps(rerun::RecordingStream &stream, int64_t ros_timestamp_ns) {
+  const auto elapsed_ns = steady_clock().now().nanoseconds() - steady_elapsed_origin_ns();
+  stream.set_time_duration_nanos("steady_elapsed", elapsed_ns);
+  stream.set_time_timestamp_nanos_since_epoch("ros2_timestamp", ros_timestamp_ns);
+}
+
 } // namespace
 
-// TODO: make the out file path configurable
-void initialize_rerun() {
-  static std::once_flag initialized;
-  std::call_once(initialized, [] {
-    auto &stream = recording_stream();
-    const auto sink_error = stream.set_sinks(rerun::FileSink{"object_tracker.rrd"});
-    if (sink_error.is_err()) {
-      throw std::runtime_error("Failed to configure Rerun output: " + sink_error.description);
+void initialize_rerun(const std::filesystem::path &recording_path) {
+  if (recording_path.empty()) {
+    throw std::invalid_argument("Rerun recording path must not be empty");
+  }
+
+  const auto absolute_path = std::filesystem::absolute(recording_path).lexically_normal();
+  static std::mutex initialization_mutex;
+  static std::filesystem::path initialized_path;
+  static bool initialized = false;
+  std::lock_guard lock(initialization_mutex);
+  if (initialized) {
+    if (absolute_path != initialized_path) {
+      throw std::invalid_argument("Rerun recording path must match across pipeline components: " +
+                                  initialized_path.string() + " != " + absolute_path.string());
     }
-    stream.set_global();
-  });
+    return;
+  }
+
+  const auto parent_path = absolute_path.parent_path();
+  if (!parent_path.empty()) {
+    std::filesystem::create_directories(parent_path);
+  }
+
+  auto &stream = recording_stream();
+  const auto sink_error = stream.set_sinks(rerun::FileSink{absolute_path.string()});
+  if (sink_error.is_err()) {
+    throw std::runtime_error("Failed to configure Rerun output at '" + absolute_path.string() +
+                             "': " + sink_error.description);
+  }
+  stream.set_global();
+  steady_elapsed_origin_ns();
+  initialized_path = absolute_path;
+  initialized = true;
 }
 
 void log_scalar(std::string_view entity_path, double value, int64_t ros_timestamp_ns) {
   auto &stream = rerun::RecordingStream::current();
-  stream.set_time_timestamp_nanos_since_epoch("ros2_timestamp", ros_timestamp_ns);
+  set_timeline_timestamps(stream, ros_timestamp_ns);
   stream.log(entity_path, rerun::Scalars(value));
 }
 
 void log_encoded_image(std::string_view entity_path, const sensor_msgs::msg::CompressedImage::ConstSharedPtr msg,
                        int64_t ros_timestamp_ns) {
   auto &stream = rerun::RecordingStream::current();
-  stream.set_time_timestamp_nanos_since_epoch("ros2_timestamp", ros_timestamp_ns);
+  set_timeline_timestamps(stream, ros_timestamp_ns);
 
   const auto &image_data = msg->data;
   if (image_data.empty()) {
@@ -75,7 +114,7 @@ void log_encoded_image(std::string_view entity_path, const sensor_msgs::msg::Com
 void log_detections(std::string_view entity_path, const vision_msgs::msg::Detection2DArray &detections,
                     std::span<const char *const> class_names, int64_t ros_timestamp_ns) {
   auto &stream = rerun::RecordingStream::current();
-  stream.set_time_timestamp_nanos_since_epoch("ros2_timestamp", ros_timestamp_ns);
+  set_timeline_timestamps(stream, ros_timestamp_ns);
 
   if (detections.detections.empty()) {
     stream.log(entity_path, rerun::Clear::FLAT);
@@ -121,15 +160,6 @@ void log_detections(std::string_view entity_path, const vision_msgs::msg::Detect
                    .with_labels(labels)
                    .with_show_labels(rerun::components::ShowLabels(true));
   stream.log(entity_path, boxes);
-}
-
-rclcpp::Clock::SharedPtr create_clock(rclcpp::Node &node) {
-  bool use_sim_time = false;
-  node.get_parameter_or("use_sim_time", use_sim_time, false);
-  if (use_sim_time) {
-    return node.get_clock(); // reads from /clock topic when sim time enabled
-  }
-  return std::make_shared<rclcpp::Clock>(RCL_STEADY_TIME);
 }
 
 } // namespace object_tracker::metrics

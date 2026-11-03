@@ -1,8 +1,13 @@
-from launch.actions import ExecuteProcess
+from datetime import datetime, timezone
+
+from launch.actions import DeclareLaunchArgument, ExecuteProcess
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 
 from launch import LaunchDescription
+
+recording_path = LaunchConfiguration("recording_path")
 
 
 def generate_launch_description():
@@ -31,6 +36,7 @@ def generate_launch_description():
                         "image_topic": "/camera/image_raw/compressed",
                         "detection_topic": "/detections",
                         "log_input_image": False,
+                        "recording_path": recording_path,
                     }
                 ],
                 extra_arguments=[{"use_intra_process_comms": True}],
@@ -64,4 +70,19 @@ def generate_launch_description():
         output="screen",
     )
 
-    return LaunchDescription([foxglove_bridge, kitty_player, tracker_container])
+    return LaunchDescription(
+        [
+            DeclareLaunchArgument(
+                "recording_path",
+                default_value=(
+                    "runs/"
+                    f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}"
+                    "_yolo11n_kitti-0019/recording.rrd"
+                ),
+                description="Path for the Rerun recording. The parent directory is created automatically.",
+            ),
+            foxglove_bridge,
+            kitty_player,
+            tracker_container,
+        ]
+    )
