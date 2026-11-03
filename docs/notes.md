@@ -231,6 +231,46 @@ only give 2× more throughput with 5× more latency (diminishing returns as you 
 
 You can build multiple engines (one per batch size) and dispatch at runtime based on current queue depth.
 
+## Model Export via Ultralytics CLI
+
+TODO:
+
+Export a model to a TensorRT `.engine` with the Ultralytics CLI. Run exports on a supported NVIDIA GPU with TensorRT
+installed; replace the model and dataset paths as needed.
+
+```bash
+# FP32 (default precision)
+yolo export model=yolo11n.pt format=engine half=False int8=False
+
+# FP16
+yolo export model=yolo11n.pt format=engine half=True
+
+# INT8 (dataset YAML is used for calibration)
+yolo export model=yolo11n.pt format=engine int8=True data=coco.yaml
+```
+
+For INT8, use representative calibration data and validate accuracy and performance on the target device.
+
+
+## Warmp Up & Latency
+
+The first inference calls after creating an ONNX Runtime (ORT) session are often slower than steady-state calls. Session
+creation loads and checks the model, configures execution providers, and may perform graph optimizations; some work is
+deferred until the first runs. Warm-up runs can trigger lazy kernel/provider initialization, memory and buffer
+allocation, GPU context setup, and (depending on the execution provider and model) compilation or algorithm selection.
+These one-time costs are then mostly avoided on later inferences, reducing and stabilizing their latency. Warm-up inputs
+should use the same shapes and execution path expected in production; dynamic shapes may require warming each relevant
+shape.
+
+What is warmed is primarily the **runtime and execution path**, not the model's learned parameters. ORT does not change
+the weights. Runtime/provider state, allocated buffers, hardware state, and possibly OS file pages become warm; the
+exact pieces depend on the execution provider. There is no single universal “warm-up cache.”
+
+Most in-memory ORT and provider state is lost when the process (or session/context) is destroyed, so a new process may
+again incur first-run costs. Disk-backed compilation or engine caches, if explicitly enabled, and the OS page cache may
+survive process exit; they disappear when cleared or evicted. A machine reboot clears volatile memory and GPU state, but
+not persistent disk caches.
+
 
 ## Practical recommendation
 ```
@@ -247,7 +287,7 @@ PyTorch model
 # ROS Workflows
 
 ## Observability
-Live observability not 
+
 | Stream | Rate | Content | Consumption | Notes |
 | --- | --- | --- | --- | --- |
 | File (e.g., `*.rrd`) | Full rate (~ 10 Hz) | Scalars; (images, see note) | Offline inspection (e.g. in rerun viewer) | Logging scalars with rerun is negligible even on Jetson. If logging images, reduce rate: conditional logging or fixed low rate. |
@@ -623,19 +663,27 @@ reference) with no ownership semantics.
   example, when a simulation starts, resets, or seeks). It may be zero before the first simulated clock value; check
   whether ROS time is active and whether the timestamp is valid before relying on it.
 
-An **epoch** is the origin from which a clock measures time. Clock values with different types or epochs are not
-interchangeable: a steady-clock value is not a date, and timestamps from separate simulation runs should not be compared
-or subtracted as though they shared an origin. Use a consistent clock for elapsed-time calculations, and account for
-ROS-time jumps when maintaining timers or state across simulation resets.
+An **epoch** is the arbitrary origin from which a clock measures time.
 
-One gotcha: don't construct a bare `rclcpp::Clock(RCL_ROS_TIME)` yourself — without a `TimeSource` attached it will
-silently fall back to system time. Always use `node->get_clock() `for the ROS-time path. The docs explicitly warn about
-this.
+The *arbitrary* epoch is a **fundamental property of monotonic clocks** at the OS/POSIX level, and every language that
+exposes one inherits it. The C++ standard is just mirroring what POSIX already says. While `std::chrono::system_clock`
+typically uses the **Unix epoch (January 1, 1970)**, `steady_clock` is designed to be monotonic and immune to system
+clock adjustments, so its zero point is often the system boot time or the process start time.
 
-The community consensus (and the direction the API is moving) is to stay within `rclcpp::Clock` / `rclcpp::Time` inside
-nodes, and reserve raw `std::chrono` for code that has no ROS context at all.
+The reason the epoch must be unspecified is practical: there's no universally meaningful "zero" for a monotonic counter.
+The only contract is that the value **never decreases** and **differences between two readings are valid durations** —
+the absolute value is meaningless.
 
-**Practical rule of thumb**
+Clock values with different types or epochs are not interchangeable: a steady-clock value is not a date, and timestamps
+from separate simulation runs should not be compared or subtracted as though they shared an origin. Use a consistent
+clock for elapsed-time calculations, and account for ROS-time jumps when maintaining timers or state across simulation
+resets.
+
+
+### Sim Time
+`use_sim_time:=True` makes the `node->get_clock() ` read the timestamps from the `/clock` topic.
+
+### Practical rule of thumb
 
 | Context | Use |
 |---|---|
@@ -643,3 +691,10 @@ nodes, and reserve raw `std::chrono` for code that has no ROS context at all.
 | Free function / test / benchmark with no node | `std::chrono::steady_clock` is fine |
 | Passing a duration to `rclcpp::sleep_for` | `std::chrono::milliseconds(50)` (sanctioned) |
 | Passing a duration to `rclcpp::Rate` | `std::chrono::milliseconds(50)` (sanctioned) |
+
+One gotcha: don't construct a bare `rclcpp::Clock(RCL_ROS_TIME)` yourself — without a `TimeSource` attached it will
+silently fall back to system time. Always use `node->get_clock()` for the ROS-time path. The docs explicitly warn about
+this.
+
+The community consensus (and the direction the API is moving) is to stay within `rclcpp::Clock` / `rclcpp::Time` inside
+nodes, and reserve raw `std::chrono` for code that has no ROS context at all.
