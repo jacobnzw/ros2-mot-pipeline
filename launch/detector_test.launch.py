@@ -17,6 +17,7 @@ loop = LaunchConfiguration("loop")
 def generate_launch_description():
 
     mcap_path = "data/kitti/left_color/mcap/0019/0019.mcap"
+
     def create_bag_player(context: LaunchContext) -> list[ExecuteProcess]:
         command = ["ros2", "bag", "play", mcap_path, "--clock", "--rate", "1.0"]
         if loop.perform(context).lower() == "true":

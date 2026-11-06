@@ -1,0 +1,2 @@
+vision_msgs/Detection2DArray detections
+int64 detector_start_steady_ns

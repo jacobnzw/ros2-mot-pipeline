@@ -32,9 +32,9 @@ YoloDetectorObserver::YoloDetectorObserver(const rclcpp::NodeOptions &options)
 
   // Create subscription for the image_topic and bind callback
   const auto detections_topic = get_parameter("detections_topic").as_string();
-  detections_sub_ = create_subscription<vision_msgs::msg::Detection2DArray>(
+  detections_sub_ = create_subscription<msg::TimedDetection2DArray>(
       detections_topic, rclcpp::SensorDataQoS(),
-      [this](const vision_msgs::msg::Detection2DArray::ConstSharedPtr msg) { this->foxgloveConversionCallback(msg); });
+      [this](msg::TimedDetection2DArray::ConstSharedPtr msg) { this->foxgloveConversionCallback(msg); });
 
   // Create publisher for the detection_topic
   // TODO: Tune QoS: declare_parameter for QoS --> no rebuilds --> faster iterations via launch file!
@@ -43,12 +43,12 @@ YoloDetectorObserver::YoloDetectorObserver(const rclcpp::NodeOptions &options)
   annotations_pub_ = create_publisher<foxglove_msgs::msg::ImageAnnotations>(annotation_topic, qos_pub);
 }
 
-void YoloDetectorObserver::foxgloveConversionCallback(const vision_msgs::msg::Detection2DArray::ConstSharedPtr msg) {
+void YoloDetectorObserver::foxgloveConversionCallback(const msg::TimedDetection2DArray::ConstSharedPtr msg) {
   foxglove_msgs::msg::ImageAnnotations annotations;
-  annotations.timestamp = msg->header.stamp;
+  annotations.timestamp = msg->detections.header.stamp;
 
-  for (std::size_t index = 0; index < msg->detections.size(); ++index) {
-    const auto &bbox = msg->detections[index].bbox;
+  for (std::size_t index = 0; index < msg->detections.detections.size(); ++index) {
+    const auto &bbox = msg->detections.detections[index].bbox;
     const double center_x = bbox.center.position.x;
     const double center_y = bbox.center.position.y;
     const double theta = bbox.center.theta;

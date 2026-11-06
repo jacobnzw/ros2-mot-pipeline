@@ -170,8 +170,8 @@ vision_msgs::msg::Detection2DArray decode_yolo_output(const InferenceResult &inf
 
 } // namespace
 
-YoloDetectorComponent::Latencies YoloDetectorComponent::measure_latencies(const rclcpp::Time &image_stamp) {
-  const auto callback_start = steady_clock_->now();
+YoloDetectorComponent::Latencies YoloDetectorComponent::measure_latencies(const rclcpp::Time &callback_start,
+                                                                           const rclcpp::Time &image_stamp) {
   const auto image_stamp_ns = image_stamp.nanoseconds();
   double callback_interval_ms = 0.0;
   double image_stamp_interval_ms = 0.0;
@@ -261,18 +261,18 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
   // TODO: Tune QoS
   const auto detection_topic = get_parameter("detection_topic").as_string();
   const auto qos_pub = rclcpp::SensorDataQoS().keep_last(1);
-  detections_pub_ = create_publisher<vision_msgs::msg::Detection2DArray>(detection_topic, qos_pub);
+  detections_pub_ = create_publisher<msg::TimedDetection2DArray>(detection_topic, qos_pub);
 
   RCLCPP_INFO(get_logger(), "YOLO detector component initialized with model '%s'.", model_path.c_str());
 }
 
 void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImage::ConstSharedPtr msg) {
+  const auto callback_start = steady_clock_->now();
   if (!model_) {
     RCLCPP_FATAL_THROTTLE(get_logger(), *get_clock(), 5000, "Detector model is not loaded.");
     return;
   }
-  // TODO: if use_sim_time=True rclcpp::Time(msg->header.stamp) otherwise steady_clock_->now()
-  const auto latencies = measure_latencies(rclcpp::Time(msg->header.stamp));
+  const auto latencies = measure_latencies(callback_start, rclcpp::Time(msg->header.stamp));
 
   if (latencies.had_previous_image) {
     metrics::log_scalar("detector/callback_interval_ms", latencies.callback_interval_ms, latencies.image_stamp_ns);
@@ -290,24 +290,27 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
     auto detections = decode_yolo_output(inference, msg->header, confidence_threshold_, nms_threshold_);
     RCLCPP_DEBUG(get_logger(), "Decoded %zu detections", detections.detections.size());
 
-    // Publish detections
-    auto detections_msg = std::make_unique<vision_msgs::msg::Detection2DArray>(std::move(detections));
-    RCLCPP_DEBUG(get_logger(), "Publishing detections at %p", static_cast<void *>(detections_msg.get()));
-    detections_pub_->publish(std::move(detections_msg));
+    auto timed_detections = std::make_unique<msg::TimedDetection2DArray>();
+    timed_detections->detections = std::move(detections);
+    timed_detections->detector_start_steady_ns = latencies.callback_start.nanoseconds();
 
     const auto image_age_ms =
         (get_clock()->now() - rclcpp::Time(msg->header.stamp, get_clock()->get_clock_type())).seconds() * 1000.0;
-    const auto callback_duration_ms = (steady_clock_->now() - latencies.callback_start).seconds() * 1000.0;
 
     // Log latencies & (conditionally) images w/ detections
-    metrics::log_scalar("detector/callback_duration_ms", callback_duration_ms, latencies.image_stamp_ns);
     metrics::log_scalar("detector/preprocessing_latency_ms", inference.preprocessing_latency_ms,
                         latencies.image_stamp_ns);
     metrics::log_scalar("detector/inference_latency_ms", inference.inference_latency_ms, latencies.image_stamp_ns);
     if (log_input_image_) {
       metrics::log_encoded_image("camera/image_raw/compressed", msg, latencies.image_stamp_ns);
-      metrics::log_detections("detector/detections", detections, kCocoClassNames, latencies.image_stamp_ns);
+      metrics::log_detections("detector/detections", timed_detections->detections, kCocoClassNames,
+                              latencies.image_stamp_ns);
     }
+
+    RCLCPP_DEBUG(get_logger(), "Publishing timed detections at %p", static_cast<void *>(timed_detections.get()));
+    detections_pub_->publish(std::move(timed_detections));
+    const auto callback_duration_ms = (steady_clock_->now() - latencies.callback_start).seconds() * 1000.0;
+    metrics::log_scalar("detector/callback_duration_ms", callback_duration_ms, latencies.image_stamp_ns);
 
     if (latencies.had_previous_image) {
       RCLCPP_DEBUG_THROTTLE(get_logger(), *get_clock(), 500,

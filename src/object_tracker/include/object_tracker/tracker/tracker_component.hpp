@@ -1,6 +1,7 @@
 #pragma once
 
 #include "object_tracker/msg/tracked_object_array.hpp"
+#include "object_tracker/msg/timed_detection2_d_array.hpp"
 #include "object_tracker/tracker/byte_tracker.hpp"
 
 #include <rclcpp/rclcpp.hpp>
@@ -24,7 +25,7 @@ private:
     bool had_previous_detections = false;
   };
 
-  void detectionsCallback(const vision_msgs::msg::Detection2DArray::UniquePtr msg);
+  void detectionsCallback(const msg::TimedDetection2DArray::UniquePtr msg);
   Latencies measure_latencies(const rclcpp::Time &detections_stamp);
   std::vector<Detection> convert(const vision_msgs::msg::Detection2DArray &detections_msg) const;
   msg::TrackedObjectArray convert(const std::vector<TrackedObject> &tracked_objects,
@@ -41,7 +42,7 @@ private:
   int64_t previous_callback_start_ns_{0};
   int64_t frame_drop_count_{0};
 
-  rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr detections_sub_;
+  rclcpp::Subscription<msg::TimedDetection2DArray>::SharedPtr detections_sub_;
   rclcpp::Publisher<object_tracker::msg::TrackedObjectArray>::SharedPtr tracks_pub_;
 };
 

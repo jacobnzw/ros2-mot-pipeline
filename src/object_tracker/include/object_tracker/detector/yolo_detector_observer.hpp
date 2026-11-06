@@ -2,7 +2,8 @@
 
 #include <foxglove_msgs/msg/image_annotations.hpp>
 #include <rclcpp/rclcpp.hpp>
-#include <vision_msgs/msg/detection2_d_array.hpp>
+
+#include "object_tracker/msg/timed_detection2_d_array.hpp"
 
 namespace object_tracker {
 
@@ -11,9 +12,9 @@ public:
   explicit YoloDetectorObserver(const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
 
 private:
-  void foxgloveConversionCallback(const vision_msgs::msg::Detection2DArray::ConstSharedPtr msg);
+  void foxgloveConversionCallback(const msg::TimedDetection2DArray::ConstSharedPtr msg);
 
-  rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr detections_sub_;
+  rclcpp::Subscription<msg::TimedDetection2DArray>::SharedPtr detections_sub_;
   rclcpp::Publisher<foxglove_msgs::msg::ImageAnnotations>::SharedPtr annotations_pub_;
 };
 
