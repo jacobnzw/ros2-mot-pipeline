@@ -191,11 +191,8 @@ void log_tracks(std::string_view entity_path, const msg::TrackedObjectArray &tra
                          static_cast<float>((track.y1 + track.y2) * 0.5));
     half_sizes.emplace_back(static_cast<float>(width * 0.5), static_cast<float>(height * 0.5));
 
-    const auto class_id = track.class_id;
-    const auto class_name =
-        class_id >= 0 && static_cast<size_t>(class_id) < kCocoClassNames.size()
-            ? kCocoClassNames[static_cast<size_t>(class_id)]
-            : "unknown";
+    const auto kitti_class_name = kitti_class_for_coco(track.class_id);
+    const auto class_name = kitti_class_name.empty() ? std::string_view("unknown") : kitti_class_name;
     labels.emplace_back(fmt::format("{} #{}", class_name, track.track_id));
   }
 

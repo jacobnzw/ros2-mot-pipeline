@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <stdexcept>
 
 namespace object_tracker {
@@ -65,17 +66,18 @@ vision_msgs::msg::Detection2DArray decode_yolo_output(const InferenceResult &inf
   std::vector<DetectionCandidate> candidates;
   for (int64_t candidate = 0; candidate < candidate_count; ++candidate) {
 
-    // Find the highest confidence class_id (mostly likely object class)
-    int class_id = 0;
-    float score = value_at(4, candidate);
-    for (int class_index = 1; class_index < static_cast<int>(kCocoClassNames.size()); ++class_index) {
+    // Choose the highest-scoring COCO class that maps to a KITTI tracking class.
+    int class_id = -1;
+    float score = -std::numeric_limits<float>::infinity();
+    for (const auto &mapping : kCocoToKittiClasses) {
+      const int class_index = mapping.coco_class_id;
       const float class_score = value_at(4 + class_index, candidate);
       if (class_score > score) {
         score = class_score;
         class_id = class_index;
       }
     }
-    if (!std::isfinite(score) || score < confidence_threshold) {
+    if (class_id < 0 || !std::isfinite(score) || score < confidence_threshold) {
       continue;
     }
 
@@ -104,15 +106,13 @@ vision_msgs::msg::Detection2DArray decode_yolo_output(const InferenceResult &inf
     candidates.push_back({class_id, score, cv::Rect2d(x0, y0, x1 - x0, y1 - y0)});
   }
 
-  // For each COCO object class_id...
-  // TODO: potentially restrict to only car and person (peds)
-  for (int class_id = 0; class_id < static_cast<int>(kCocoClassNames.size()); ++class_id) {
+  for (const auto kitti_class_name : kKittiClassNames) {
 
     std::vector<cv::Rect2d> boxes;
     std::vector<float> scores;
     std::vector<size_t> candidate_indices;
     for (size_t index = 0; index < candidates.size(); ++index) {
-      if (candidates[index].class_id == class_id) {
+      if (kitti_class_for_coco(candidates[index].class_id) == kitti_class_name) {
         boxes.push_back(candidates[index].box);
         scores.push_back(candidates[index].score);
         candidate_indices.push_back(index);
@@ -138,7 +138,7 @@ vision_msgs::msg::Detection2DArray decode_yolo_output(const InferenceResult &inf
       detection.bbox.size_y = candidate.box.height;
 
       vision_msgs::msg::ObjectHypothesisWithPose result;
-      result.hypothesis.class_id = std::to_string(class_id);
+      result.hypothesis.class_id = std::to_string(candidate.class_id);
       result.hypothesis.score = candidate.score;
 
       detection.results.push_back(std::move(result)); // std::vector<ObjectHypothesisWithPose>
