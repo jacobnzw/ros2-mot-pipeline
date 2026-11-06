@@ -25,7 +25,7 @@
 ### Minimal deliverables
 
 - [ ] Reproducible offline detector + tracker baseline with ONNX validation.
-- [ ] Working ROS2 three-node pipeline (image source → detector → tracker) with timestamps and bounded queues.
+- [ ] Working ROS2 pipeline (image source → detector → tracker) with timestamps and bounded queues.
 - [ ] Latency, tracking-metric, and resource report on at least two sequences.
 - [ ] Clear go/no-go recommendation for Jetson.
 - [ ] Honest conclusion regardless of whether “real-time” targets are met.
@@ -99,22 +99,20 @@ A valid result is a clean offline Python pipeline
 - [x] C++ ROS2 components with clear interfaces
   - [x] Preprocessing + YOLO Detector component
   - [x] ByteTrack Tracker component
-- [ ] Metrics & Diagnostics Node
-  - [ ] Per-stage latency logging (receive → inference start → publish).
-  - [ ] Basic diagnostics (queue depth, frame drop count).
-- [ ] Visualization via Foxglove
-  - [ ] Simple visualisation of tracks.
-- [ ] Middleware Tunning
-  - [ ] Bounded queues (depth 1–3).
-  - [ ] Correct timestamp propagation (sensor time, not wall time).
+- [x] Observability
+  - [x] Per-stage latency logging (receive → inference start → publish).
+  - [x] Basic diagnostics (queue depth, frame drop count).
+- [x] Middleware Tunning
+  - [x] Bounded queues (depth 1–3).
+  - [x] Correct timestamp propagation (sensor time, not wall time).
 
 #### KPIs & Parameters
 
-- [ ] End-to-end latency (t_track_output – t_image_stamp).
-- [ ] Per-stage latencies (p50/p95/p99)
+- [x] End-to-end latency (t_track_output – t_image_stamp).
+- [x] Per-stage latencies (p50/p95/p99)
   - YOLO inference
   - ByteTrack association
-  - Frame drop count, inter-callback intervals, DEFINE: jitter, starvation
+  - Frame drop count, inter-callback intervals
 - [ ] Queue depth and drop rate under sustained replay.
   - [ ] [takt-vision's stress test](https://github.com/GBR-RL/takt-vision/blob/main/scripts/overload_experiment.sh) The
     overload experiment: a 30 fps camera feeding a detector that manages only ~25 fps. Runs the same scenario under each
@@ -135,7 +133,7 @@ A valid result is a clean offline Python pipeline
 
 ## Phase 2: Jetson Deployment
 
-- [ ] Improve latency of YOLO11n: should be way ~1-3ms, which is way below the current 30ms on RTX3090
+- [ ] Improve latency of YOLO11n: should be ~1-3ms, which is way below the current 30ms on RTX3090
 
 Rent Jetson at [cloudjetson.com](cloudjetson.com) (~1 USD / hr).
 
