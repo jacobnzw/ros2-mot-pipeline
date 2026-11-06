@@ -6,15 +6,16 @@ flowchart LR
 
     subgraph PCSG["perception_container (process)"]
         direction LR
-        P["Preprocess<br/>"] --> D["Detector<br/>(ONNX YOLO)"] --> T["Tracker<br/>(ByteTrack)"]
+        P["Preprocess<br/>"] --> D["Detector<br/>(ONNX YOLO)"]
+        D -->|"TimedDetection2DArray<br/>(detections + steady start)"| T["Tracker<br/>(ByteTrack)"]
     end
 
-    T -->|"vision_msgs/Detection2DArray<br/>(or custom TrackArray)"| V["visualizer<br/>(Foxglove)<br/>(normal node)"]
+    T -->|"object_tracker/TrackedObjectArray"| V["visualizer<br/>(Foxglove)<br/>(normal node)"]
     T -->|"Debug image<br/>(optional)"| V
     T -->|"metrics / logs"| M["metrics / logger <br/>(node)"]
 ```
 
-Metrics node: Publishes or logs end-to-end latency, drop rates, track count, Timers, `/diagnostics`, parameters
+Metrics node: Logs steady-clock end-to-end latency, drop rates, track count, Timers, `/diagnostics`, parameters
 
 
 ### Hypothesis

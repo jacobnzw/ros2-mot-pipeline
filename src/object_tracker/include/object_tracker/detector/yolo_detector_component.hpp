@@ -2,9 +2,9 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/compressed_image.hpp>
-#include <vision_msgs/msg/detection2_d_array.hpp>
 
 #include "object_tracker/detector/onnx_model.hpp"
+#include "object_tracker/msg/timed_detection2_d_array.hpp"
 
 #include <cstdint>
 #include <mutex>
@@ -26,7 +26,7 @@ private:
   };
 
   void imageCallback(const sensor_msgs::msg::CompressedImage::ConstSharedPtr msg);
-  Latencies measure_latencies(const rclcpp::Time &image_stamp);
+  Latencies measure_latencies(const rclcpp::Time &callback_start, const rclcpp::Time &image_stamp);
 
   // TODO: WHY shared_ptr here?
   std::shared_ptr<OnnxModel> model_;
@@ -46,7 +46,7 @@ private:
   int64_t frame_drop_count_{0};
 
   rclcpp::Subscription<sensor_msgs::msg::CompressedImage>::SharedPtr image_sub_;
-  rclcpp::Publisher<vision_msgs::msg::Detection2DArray>::SharedPtr detections_pub_;
+  rclcpp::Publisher<msg::TimedDetection2DArray>::SharedPtr detections_pub_;
 };
 
 } // namespace object_tracker

@@ -81,7 +81,8 @@ endif()
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/TrackedObject.msg"
   "msg/TrackedObjectArray.msg"
-  DEPENDENCIES std_msgs
+  "msg/TimedDetection2DArray.msg"
+  DEPENDENCIES std_msgs vision_msgs
 )
 # Make the generated types visible to the rest of the package
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
@@ -116,7 +117,7 @@ target_include_directories(yolo_detector_component
   "${ONNXRUNTIME_INCLUDE_DIR}"
   ${OpenCV_INCLUDE_DIRS}
 )
-target_link_libraries(yolo_detector_component PUBLIC yolo_onnx PRIVATE pipeline_metrics)
+target_link_libraries(yolo_detector_component PUBLIC yolo_onnx PRIVATE pipeline_metrics "${cpp_typesupport_target}")
 ament_target_dependencies(yolo_detector_component
   PUBLIC
   rclcpp
@@ -134,7 +135,7 @@ target_include_directories(yolo_detector_observer
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>"
 )
-target_link_libraries(yolo_detector_observer)
+target_link_libraries(yolo_detector_observer PRIVATE "${cpp_typesupport_target}")
 ament_target_dependencies(yolo_detector_observer
   PUBLIC
   rclcpp
