@@ -35,6 +35,7 @@ private:
   double nms_threshold_{0.45};
   double expected_frame_rate_{10.0};
   bool log_input_image_{false};
+  bool log_detections_{false};
 
   // TODO: move to metrics possible?
   rclcpp::Clock::SharedPtr steady_clock_;

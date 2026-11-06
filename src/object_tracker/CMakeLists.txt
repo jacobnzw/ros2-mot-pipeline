@@ -28,15 +28,6 @@ FetchContent_Declare(rerun_sdk URL
 FetchContent_MakeAvailable(rerun_sdk)
 set_target_properties(rerun_sdk PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-add_library(pipeline_metrics SHARED src/metrics.cpp)
-target_include_directories(pipeline_metrics
-  PUBLIC
-  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-  "$<INSTALL_INTERFACE:include>"
-)
-target_link_libraries(pipeline_metrics PRIVATE rerun_sdk fmt::fmt)
-ament_target_dependencies(pipeline_metrics PUBLIC rclcpp sensor_msgs vision_msgs)
-
 set(ONNXRUNTIME_ROOT "$ENV{ONNXRUNTIME_ROOT}" CACHE PATH "ONNX Runtime installation prefix")
 
 # Flag to enable CUDA build, default ON
@@ -86,6 +77,15 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 )
 # Make the generated types visible to the rest of the package
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+add_library(pipeline_metrics SHARED src/metrics.cpp)
+target_include_directories(pipeline_metrics
+  PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:include>"
+)
+target_link_libraries(pipeline_metrics PRIVATE rerun_sdk fmt::fmt "${cpp_typesupport_target}")
+ament_target_dependencies(pipeline_metrics PUBLIC rclcpp sensor_msgs vision_msgs)
 
 # ---------- YOLO Detector ----------
 add_library(yolo_onnx src/detector/onnx_model.cpp)

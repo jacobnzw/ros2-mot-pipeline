@@ -5,6 +5,8 @@
 #include <sensor_msgs/msg/compressed_image.hpp>
 #include <vision_msgs/msg/detection2_d_array.hpp>
 
+#include "object_tracker/msg/tracked_object_array.hpp"
+
 #include <cstdint>
 #include <filesystem>
 #include <span>
@@ -18,5 +20,6 @@ void log_encoded_image(std::string_view entity_path, const sensor_msgs::msg::Com
                        int64_t ros_timestamp_ns);
 void log_detections(std::string_view entity_path, const vision_msgs::msg::Detection2DArray &detections,
                     std::span<const char *const> class_names, int64_t ros_timestamp_ns);
+void log_tracks(std::string_view entity_path, const msg::TrackedObjectArray &tracks, int64_t ros_timestamp_ns);
 
 } // namespace object_tracker::metrics
