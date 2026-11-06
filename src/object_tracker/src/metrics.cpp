@@ -1,4 +1,5 @@
 #include "object_tracker/metrics.hpp"
+#include "object_tracker/class_names.hpp"
 
 #include <fmt/format.h>
 #include <rclcpp/node.hpp>
@@ -149,6 +150,53 @@ void log_detections(std::string_view entity_path, const vision_msgs::msg::Detect
       label = fmt::format("{} {:.4f}", class_name, hypothesis.score);
     }
     labels.emplace_back(std::move(label));
+  }
+
+  if (centers.empty()) {
+    stream.log(entity_path, rerun::Clear::FLAT);
+    return;
+  }
+
+  auto boxes = rerun::Boxes2D::from_centers_and_half_sizes(centers, half_sizes)
+                   .with_labels(labels)
+                   .with_show_labels(rerun::components::ShowLabels(true));
+  stream.log(entity_path, boxes);
+}
+
+void log_tracks(std::string_view entity_path, const msg::TrackedObjectArray &tracks, int64_t ros_timestamp_ns) {
+  auto &stream = rerun::RecordingStream::current();
+  set_timeline_timestamps(stream, ros_timestamp_ns);
+
+  if (tracks.objects.empty()) {
+    stream.log(entity_path, rerun::Clear::FLAT);
+    return;
+  }
+
+  std::vector<rerun::Position2D> centers;
+  std::vector<rerun::HalfSize2D> half_sizes;
+  std::vector<rerun::Text> labels;
+  centers.reserve(tracks.objects.size());
+  half_sizes.reserve(tracks.objects.size());
+  labels.reserve(tracks.objects.size());
+
+  for (const auto &track : tracks.objects) {
+    const double width = static_cast<double>(track.x2) - track.x1;
+    const double height = static_cast<double>(track.y2) - track.y1;
+    if (!std::isfinite(track.x1) || !std::isfinite(track.y1) || !std::isfinite(track.x2) ||
+        !std::isfinite(track.y2) || width <= 0.0 || height <= 0.0) {
+      continue;
+    }
+
+    centers.emplace_back(static_cast<float>((track.x1 + track.x2) * 0.5),
+                         static_cast<float>((track.y1 + track.y2) * 0.5));
+    half_sizes.emplace_back(static_cast<float>(width * 0.5), static_cast<float>(height * 0.5));
+
+    const auto class_id = track.class_id;
+    const auto class_name =
+        class_id >= 0 && static_cast<size_t>(class_id) < kCocoClassNames.size()
+            ? kCocoClassNames[static_cast<size_t>(class_id)]
+            : "unknown";
+    labels.emplace_back(fmt::format("{} #{}", class_name, track.track_id));
   }
 
   if (centers.empty()) {

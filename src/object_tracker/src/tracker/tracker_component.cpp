@@ -21,6 +21,7 @@ TrackerComponent::TrackerComponent(const rclcpp::NodeOptions &options) : Node("t
   declare_parameter("track_buffer", 10);          // frames a lost track is kept for re-identification
   declare_parameter("frame_rate", 10.0);
   declare_parameter("fuse_score", true);
+  declare_parameter("log_tracks", true);
   declare_parameter("recording_path", std::string("runs/recording.rrd"));
 
   ByteTrackerOptions tracker_options;
@@ -33,6 +34,7 @@ TrackerComponent::TrackerComponent(const rclcpp::NodeOptions &options) : Node("t
   tracker_options.fuse_score = get_parameter("fuse_score").as_bool();
 
   expected_frame_rate_ = tracker_options.frame_rate;
+  log_tracks_ = get_parameter("log_tracks").as_bool();
   if (!std::isfinite(expected_frame_rate_) || expected_frame_rate_ <= 0.0) {
     throw std::invalid_argument("frame_rate must be finite and greater than zero");
   }
@@ -78,6 +80,9 @@ void TrackerComponent::detectionsCallback(const msg::TimedDetection2DArray::Uniq
 
   auto tracks_out = convert(tracker_result.tracked_objects, msg->detections.header);
   tracks_pub_->publish(tracks_out);
+  if (log_tracks_) {
+    metrics::log_tracks("tracker/tracks", tracks_out, latencies.detections_stamp_ns);
+  }
   const rclcpp::Time detector_start(msg->detector_start_steady_ns, RCL_STEADY_TIME);
   const auto pipeline_latency = steady_clock_->now() - detector_start;
   metrics::log_scalar("pipeline/end_to_end_latency_ms", pipeline_latency.seconds() * 1000.0,

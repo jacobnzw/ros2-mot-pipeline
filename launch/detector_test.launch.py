@@ -9,6 +9,8 @@ from launch import LaunchDescription, LaunchContext
 
 log_level = LaunchConfiguration("log_level")
 log_input_image = LaunchConfiguration("log_input_image")
+log_detections = LaunchConfiguration("log_detections")
+log_tracks = LaunchConfiguration("log_tracks")
 thread_num = LaunchConfiguration("thread_num")
 recording_path = LaunchConfiguration("recording_path")
 loop = LaunchConfiguration("loop")
@@ -36,12 +38,13 @@ def generate_launch_description():
                     "image_topic": "/camera/image_raw/compressed",
                     "detection_topic": "/detections",
                     "log_input_image": log_input_image,
+                    "log_detections": log_detections,
                     "recording_path": recording_path,
                 }
             ],
             extra_arguments=[{"use_intra_process_comms": True}],
         ),
-        # Detections from detection2DArray used as observations for forming tracks output as TrackedObjectArray
+        # Timed detections used as observations for forming tracks output as TrackedObjectArray
         ComposableNode(
             package="object_tracker",
             plugin="object_tracker::TrackerComponent",
@@ -58,6 +61,7 @@ def generate_launch_description():
                     "track_buffer": 10,  # frames a lost track is kept for re-identification
                     "frame_rate": 10.0,
                     "fuse_score": True,
+                    "log_tracks": log_tracks,
                     "recording_path": recording_path,
                 }
             ],
@@ -100,6 +104,18 @@ def generate_launch_description():
                 default_value="false",
                 choices=["true", "false"],
                 description="Whether to log the detector input image (set to true to enable).",
+            ),
+            DeclareLaunchArgument(
+                "log_detections",
+                default_value="false",
+                choices=["true", "false"],
+                description="Whether to log detector bounding boxes to Rerun.",
+            ),
+            DeclareLaunchArgument(
+                "log_tracks",
+                default_value="true",
+                choices=["true", "false"],
+                description="Whether to log tracker bounding boxes to Rerun.",
             ),
             DeclareLaunchArgument(
                 "thread_num",

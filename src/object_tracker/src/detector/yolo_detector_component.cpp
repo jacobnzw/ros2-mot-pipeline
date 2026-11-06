@@ -1,4 +1,5 @@
 #include "object_tracker/detector/yolo_detector_component.hpp"
+#include "object_tracker/class_names.hpp"
 
 #include <cv_bridge/cv_bridge.hpp>
 #include <memory>
@@ -10,28 +11,12 @@
 #include <sensor_msgs/image_encodings.hpp>
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstdint>
 #include <stdexcept>
 
 namespace object_tracker {
 namespace {
-
-// TODO: Reduce: we only care about: person, car; (maybe: train, bus, bicycle, traffic light, motorcycle, stop sign)
-constexpr std::array<const char *, 80> kCocoClassNames{
-    "person",         "bicycle",    "car",           "motorcycle",    "airplane",     "bus",           "train",
-    "truck",          "boat",       "traffic light", "fire hydrant",  "stop sign",    "parking meter", "bench",
-    "bird",           "cat",        "dog",           "horse",         "sheep",        "cow",           "elephant",
-    "bear",           "zebra",      "giraffe",       "backpack",      "umbrella",     "handbag",       "tie",
-    "suitcase",       "frisbee",    "skis",          "snowboard",     "sports ball",  "kite",          "baseball bat",
-    "baseball glove", "skateboard", "surfboard",     "tennis racket", "bottle",       "wine glass",    "cup",
-    "fork",           "knife",      "spoon",         "bowl",          "banana",       "apple",         "sandwich",
-    "orange",         "broccoli",   "carrot",        "hot dog",       "pizza",        "donut",         "cake",
-    "chair",          "couch",      "potted plant",  "bed",           "dining table", "toilet",        "tv",
-    "laptop",         "mouse",      "remote",        "keyboard",      "cell phone",   "microwave",     "oven",
-    "toaster",        "sink",       "refrigerator",  "book",          "clock",        "vase",          "scissors",
-    "teddy bear",     "hair drier", "toothbrush"};
 
 struct DetectionCandidate {
   int class_id;
@@ -218,12 +203,14 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
   declare_parameter("nms_threshold", 0.45);
   declare_parameter("expected_frame_rate", 10.0);
   declare_parameter("log_input_image", false);
+  declare_parameter("log_detections", false);
   declare_parameter("recording_path", std::string("runs/recording.rrd"));
 
   confidence_threshold_ = get_parameter("confidence_threshold").as_double();
   nms_threshold_ = get_parameter("nms_threshold").as_double();
   expected_frame_rate_ = get_parameter("expected_frame_rate").as_double();
   log_input_image_ = get_parameter("log_input_image").as_bool();
+  log_detections_ = get_parameter("log_detections").as_bool();
 
   if (confidence_threshold_ < 0.0 || confidence_threshold_ > 1.0 || nms_threshold_ < 0.0 || nms_threshold_ > 1.0) {
     throw std::invalid_argument("confidence_threshold and nms_threshold must be in [0, 1]");
@@ -303,6 +290,8 @@ void YoloDetectorComponent::imageCallback(const sensor_msgs::msg::CompressedImag
     metrics::log_scalar("detector/inference_latency_ms", inference.inference_latency_ms, latencies.image_stamp_ns);
     if (log_input_image_) {
       metrics::log_encoded_image("camera/image_raw/compressed", msg, latencies.image_stamp_ns);
+    }
+    if (log_detections_) {
       metrics::log_detections("detector/detections", timed_detections->detections, kCocoClassNames,
                               latencies.image_stamp_ns);
     }

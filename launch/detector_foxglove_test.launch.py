@@ -36,6 +36,7 @@ def generate_launch_description():
                         "image_topic": "/camera/image_raw/compressed",
                         "detection_topic": "/detections",
                         "log_input_image": False,
+                        "log_detections": False,
                         "recording_path": recording_path,
                     }
                 ],
