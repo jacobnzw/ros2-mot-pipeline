@@ -194,10 +194,18 @@ Running this will produce the prediction for sequence `0019`
 uv run scripts/mot_bench.py --kitti-seq data/kitti/left_color/training/image_02/0019
 ```
 
-Compute TrackEval MOT metrics with
+Evaluate one sequence with TrackEval (the KITTI `Kitti2DBox` implementation supports only `car` and `pedestrian`):
 ```shell
-uv run scripts/mot_trackeval.py  
+uv run scripts/mot_trackeval.py \
+  --sequence 0019 \
+  --gt-folder data/kitti/left_color/training \
+  --tracker-folder data/kitti/trackers/bytetrack \
+  --output-folder runs/trackeval/bytetrack-0019
 ```
+The tracker folder must contain `data/<sequence>.txt`. The CLI selects the requested sequence from the existing
+`evaluate_tracking.seqmap.<split>` in the GT folder without modifying that folder. Results are written under the output
+folder, including per-class summary and detailed result files. Use `--split` for a non-training seqmap and `--classes`
+to select either or both supported classes.
 
 ### Baseline
 Evaluated on sequence `0019` only. For now!
