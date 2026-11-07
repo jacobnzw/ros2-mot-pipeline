@@ -112,7 +112,7 @@ wait_for_service() {
 wait_for_service "http://127.0.0.1:8428/health" "VictoriaMetrics"
 wait_for_service "http://127.0.0.1:3000/api/health" "Grafana"
 
-# Import the CSV as a POST body. In the format mapping, each number is a
+# POST the CSV to the VictoriaMetric's import endpoint. In the format mapping, each number is a
 # one-based CSV column: timestamp, run label, stage label, and metric/value.
 # @file tells curl to read the request body from that file.
 echo "==> Importing CSV into VictoriaMetrics"

@@ -136,9 +136,28 @@ heavily biased toward detection performance (explaining over 99% of its score va
 only measures "first-order" association (identity switches between consecutive frames), **HOTA** measures "higher-order"
 association across the entire video sequence.
 
+The localization threshold $\alpha$ is the minimum Intersection over Union (IoU) required for a predicted box and a
+ground-truth box in the same frame to count as a match. For example, with $\alpha=0.5$, their IoU must be at least
+$0.5$. A higher threshold requires tighter box alignment. HOTA computes its sub-metrics at multiple thresholds and
+averages the results, so it reflects performance at both looser and stricter localization requirements.
+
+At localization threshold $\alpha$, 
+$$
+\text{DetA}_{\alpha} = \text{TP}_{\alpha}/(\text{TP}_{\alpha}+\text{FN}_{\alpha}+\text{FP}_{\alpha})
+$$.
+
+$\text{AssA}_{\alpha}$ is the average, over true-positive matches, of their association Jaccard scores:
+$$
+\text{AssA}_{\alpha} = \frac{1}{|\text{TP}_{\alpha}|}\sum_{c \in \text{TP}_{\alpha}}
+\frac{|\text{TPA}(c)|}{|\text{TPA}(c)|+|\text{FNA}(c)|+|\text{FPA}(c)|}
+$$. 
+Here, $c$ denotes one particular true-positive match at threshold $\alpha$: a ground-truth detection paired with a predicted detection in the same frame. For that match, consider the ground-truth trajectory and predicted trajectory it links across the sequence. $\text{TPA}(c)$ counts detections where this same trajectory pair is matched; $\text{FNA}(c)$ counts detections from the ground-truth trajectory not matched to that predicted trajectory; and $\text{FPA}(c)$ counts detections from the predicted trajectory not matched to that ground-truth trajectory. These counts give match $c$ its own association Jaccard score: consistent trajectory pairing raises the score, while switches or mismatches add errors and lower it. Averaging the score over all true-positive matches gives $\text{AssA}_{\alpha}$.
+
 Key differences include:
 
-*   **Balanced Scoring**: **HOTA** decomposes into **DetA** (Detection Accuracy) and **AssA** (Association Accuracy), combining them via the geometric mean: $$HOTA_{\alpha} = \sqrt{DetA_{\alpha} \cdot AssA_{\alpha}}.$$ This prevents a tracker from achieving a high score by merely detecting objects well while failing to maintain consistent IDs.
+*   **Balanced Scoring**: **HOTA** decomposes into **DetA** (Detection Accuracy) and **AssA** (Association Accuracy), 
+    combining them via the geometric mean: $$\text{HOTA}_{\alpha} = \sqrt{\text{DetA}_{\alpha} \cdot \text{AssA}_{\alpha}}.$$ This prevents a tracker from achieving a high score by merely detecting objects well while failing to maintain consistent IDs.
+              
 *   **Localization**: **HOTA** incorporates localization accuracy directly into its sub-metrics, whereas **MOTA**
     requires a separate metric (**MOTP**) to measure localization, making **HOTA** a more comprehensive single-score
     evaluation.

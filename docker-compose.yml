@@ -2,12 +2,12 @@ services:
   victoria-metrics:
     image: victoriametrics/victoria-metrics:v1.155.0
     command:
-      - -storageDataPath=/victoria-metrics-data
+      - -storageDataPath=/victoria-metrics-data  # VM's TSDB storage location
       - -retentionPeriod=31d
     ports:
       - "127.0.0.1:8428:8428"
     volumes:
-      - victoria-metrics-data:/victoria-metrics-data
+      - victoria-metrics-data:/victoria-metrics-data  # See docker volume ls, docker volume inspect <volume_name>
     restart: unless-stopped
 
   grafana:

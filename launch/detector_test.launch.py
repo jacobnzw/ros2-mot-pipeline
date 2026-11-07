@@ -5,7 +5,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 
-from launch import LaunchDescription, LaunchContext
+from launch import LaunchContext, LaunchDescription
 
 log_level = LaunchConfiguration("log_level")
 log_input_image = LaunchConfiguration("log_input_image")
@@ -130,7 +130,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "recording_path",
-                default_value=(
+                default_value=(  # TODO: accept user's label; hardcode path as runs/{datetime}_{label}/recording.rrd
                     f"runs/{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}_yolo11n_kitti-0019/recording.rrd"
                 ),
                 description="Path for the Rerun recording. The parent directory is created automatically.",

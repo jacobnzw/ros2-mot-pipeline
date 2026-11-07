@@ -1,3 +1,5 @@
+# Tell Grafana to load dashboard JSON files from /var/lib/grafana/dashboards 
+# and place them in the ROS 2 analysis folder. The path is within the Grafana docker container.
 apiVersion: 1
 
 providers:
