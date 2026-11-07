@@ -23,7 +23,7 @@
         "h": 14,
         "w": 16,
         "x": 0,
-        "y": 0
+        "y": 10
       },
       "id": 1,
       "maxDataPoints": 20000,
@@ -110,7 +110,7 @@
         "h": 9,
         "w": 16,
         "x": 0,
-        "y": 14
+        "y": 24
       },
       "id": 2,
       "maxDataPoints": 20000,
@@ -185,7 +185,7 @@
         "h": 14,
         "w": 8,
         "x": 16,
-        "y": 0
+        "y": 10
       },
       "id": 3,
       "maxDataPoints": 20000,
@@ -228,6 +228,44 @@
       ],
       "title": "Selected-stage latency histogram",
       "type": "histogram"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "description": "Per-sequence and combined TrackEval metrics. Score metrics are ratios in [0, 1]; count metrics are absolute counts.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "editorMode": "code",
+          "expr": "last_over_time(trackeval_kpi{run=\"$run\"}[31d])",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{tracker}} {{sequence}} {{class}} {{metric}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "TrackEval KPI table",
+      "type": "table"
     }
   ],
   "refresh": "5s",
@@ -248,13 +286,13 @@
           "type": "prometheus",
           "uid": "victoriametrics"
         },
-        "definition": "label_values(latency_ms, run)",
+        "definition": "label_values({__name__=~\"latency_ms|trackeval_kpi\"}, run)",
         "hide": 0,
         "includeAll": false,
         "label": "Run",
         "name": "run",
         "options": [],
-        "query": "label_values(latency_ms, run)",
+        "query": "label_values({__name__=~\"latency_ms|trackeval_kpi\"}, run)",
         "refresh": 2,
         "regex": "",
         "type": "query"
@@ -290,5 +328,5 @@
   "timezone": "browser",
   "title": "ROS 2 Latency Analysis",
   "uid": "ros2-latency",
-  "version": 1
+  "version": 2
 }

@@ -153,9 +153,13 @@ To export latency, duration, and callback-interval scalar samples to VictoriaMet
 scripts/analyse.sh runs/<run-id>/recording.rrd
 ```
 
-The script writes `latency.csv` beside the recording, starts the Compose services, waits for them to respond, and
-imports the samples into VictoriaMetrics. Each CSV row has the columns `timestamp_ms,run,stage,value` with no header and
-is imported with `1:time:unix_ms,2:label:run,3:label:stage,4:metric:latency_ms`. The run label defaults to the run
+The script writes `latency.csv` beside the recording and, if TrackEval detailed results are present under the same run
+folder, writes `trackeval.csv` there too. It starts the Compose services, waits for them to respond, and imports both
+CSVs into VictoriaMetrics. Latency rows have columns `timestamp_ms,run,stage,value` and become `latency_ms` samples.
+TrackEval rows have columns
+`timestamp_ms,run,tracker,sequence,class,metric,value` and become `trackeval_kpi` samples with run/tracker/sequence/
+class/metric labels. TrackEval timestamps use the newest detailed-results file modification time; score values are
+ratios in `[0, 1]`, while count metrics remain counts. The run label defaults to the recording
 directory name; pass an optional second argument to `analyse.sh` to override it. The stage label comes from the Rerun
 entity path (for example, `/detector/inference_latency_ms` becomes `detector_inference`). Counters and other
 non-duration scalars are omitted. You can also run `uv run scripts/rrd_to_csv.py runs/<run-id>/recording.rrd` to export
@@ -167,8 +171,9 @@ Grafana's current time range.
 
 The Compose stack uses VictoriaMetrics v1.155.0 and Grafana 12.0.0. The VictoriaMetrics image is pulled on first
 startup. The provisioned `ROS 2 Latency Analysis` dashboard includes a detector-inference heatmap (5-second X buckets
-and 25 latency buckets), rolling 5-second p50/p95/p99 inference latency, and an overall histogram for a selectable
-stage. Select the imported run in the dashboard's `Run` variable; the `Stage` variable controls the histogram panel. The
+and 25 latency buckets), rolling 5-second p50/p95/p99 inference latency, an overall histogram for a selectable stage,
+and a TrackEval KPI table for the selected run. The KPI table includes per-sequence and `COMBINED` values. Select the
+imported run in the dashboard's `Run` variable; the `Stage` variable controls the histogram panel. The
 Prometheus data source uses a 100 ms minimum query interval to retain approximately the original 10 Hz sample resolution
 for the heatmap and histogram.
 
