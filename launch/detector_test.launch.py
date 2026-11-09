@@ -1,21 +1,30 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
-from launch import LaunchContext, LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, TextSubstitution
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
+
+from launch import LaunchContext, LaunchDescription
 
 log_level = LaunchConfiguration("log_level")
 log_input_image = LaunchConfiguration("log_input_image")
 log_detections = LaunchConfiguration("log_detections")
 log_tracks = LaunchConfiguration("log_tracks")
 thread_num = LaunchConfiguration("thread_num")
-recording_path = LaunchConfiguration("recording_path")
 loop = LaunchConfiguration("loop")
 seq = LaunchConfiguration("seq")
 kitti_root = LaunchConfiguration("kitti_root")
+label = LaunchConfiguration("label")
+timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+recording_path = PathJoinSubstitution(
+    [
+        "runs",
+        [TextSubstitution(text=f"{timestamp}_"), seq, TextSubstitution(text="_"), label],
+        "recording.rrd",
+    ]
+)
 
 
 def generate_launch_description():
@@ -140,11 +149,8 @@ def generate_launch_description():
                 description="Root directory containing the sequence MCAP folders.",
             ),
             DeclareLaunchArgument(
-                "recording_path",
-                default_value=(  # TODO: accept user's label; hardcode path as runs/{datetime}_{seq}_{label}/recording.rrd
-                    f"runs/{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}_yolo11n_kitti-0019/recording.rrd"
-                ),
-                description="Path for the Rerun recording. The parent directory is created automatically.",
+                "label",
+                description="User-provided label included in the Rerun recording directory name.",
             ),
             OpaqueFunction(function=create_bag_player),
             OpaqueFunction(function=create_tracker_container),

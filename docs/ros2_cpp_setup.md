@@ -123,7 +123,7 @@ For repeated MCAP playback with the detector/tracker test launch, enable its `lo
 a set process `timeout`)
 
 ```bash
-timeout 10m ros2 launch launch/detector_test.launch.py loop:=true
+timeout 10m ros2 launch launch/detector_test.launch.py loop:=true label:=loop-test
 ```
 
 Playback then continues indefinitely; stop it with Ctrl+C. The default `loop:=false` plays the bag once.
@@ -132,18 +132,19 @@ or MCAP root with ROS 2 launch arguments (which use `name:=value` syntax rather 
 
 ```bash
 ros2 launch launch/detector_test.launch.py seq:=0020 \
-  kitti_root:=/path/to/image_02_mcap
+  kitti_root:=/path/to/image_02_mcap \
+  label:=baseline
 ```
 
 The C++ SDK fetched by CMake writes Rerun data, but does not install the standalone Rerun viewer/CLI. Install the viewer
 separately, for example with `uv tool install rerun-sdk` (see the
 [Rerun viewer installation guide](https://rerun.io/docs/getting-started/install-rerun/viewer)). After running the
 detector and tracker, their scalar metrics are written to a unique run directory under `runs/`, for example
-`runs/20261031T192717123456Z_yolo11n_kitti-0019/recording.rrd`. Open the resulting file with
-`rerun runs/<run-id>/recording.rrd`. The launch files create this run directory automatically. To choose a specific
-recording path, pass the `recording_path` launch argument; its parent directory is created automatically. The recording
-includes detector inference and callback intervals, estimated cumulative frame drops, ByteTrack association latency and
-active-track count, and image-stamp-to-tracker-output latency. Frame-drop estimates use the detector's
+`runs/<datetime>_0020_baseline/recording.rrd`. `detector_test.launch.py` requires a `label:=...` argument and creates the
+recording directory automatically using the timestamp, selected sequence, and label. Open the resulting file with
+`rerun runs/<run-id>/recording.rrd`. The recording includes detector inference and callback intervals, estimated
+cumulative frame drops, ByteTrack association latency and active-track count, and image-stamp-to-tracker-output latency.
+Frame-drop estimates use the detector's
 `expected_frame_rate` parameter and the tracker's `frame_rate` parameter. Each metric is indexed by the input message
 timestamp on the `ros2_timestamp` timeline so it can be aligned with the input images. Set the detector's
 `log_input_image` parameter to `true` to include each compressed input frame in the same recording as the metrics. This
