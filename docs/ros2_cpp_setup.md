@@ -126,7 +126,8 @@ a set process `timeout`)
 timeout 10m ros2 launch launch/detector_test.launch.py loop:=true label:=loop-test
 ```
 
-Playback then continues indefinitely; stop it with Ctrl+C. The default `loop:=false` plays the bag once.
+With `loop:=true`, playback continues indefinitely; stop it with Ctrl+C. With `loop:=false`, the launch shuts down
+automatically when bag playback ends, so it can be invoked sequentially from a script without waiting for Ctrl+C.
 The launch defaults to sequence `0019` under `data/kitti/left_color/training/image_02_mcap`. Select another sequence
 or MCAP root with ROS 2 launch arguments (which use `name:=value` syntax rather than `--name` flags):
 

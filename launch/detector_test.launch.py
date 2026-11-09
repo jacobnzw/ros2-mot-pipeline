@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, EmitEvent, ExecuteProcess, OpaqueFunction, RegisterEventHandler
+from launch.event_handlers import OnProcessExit
+from launch.events import Shutdown
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, TextSubstitution
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
@@ -28,13 +30,20 @@ recording_path = PathJoinSubstitution(
 
 
 def generate_launch_description():
-    def create_bag_player(context: LaunchContext) -> list[ExecuteProcess]:
+    def create_bag_player(context: LaunchContext) -> list[ExecuteProcess | RegisterEventHandler]:
         sequence = seq.perform(context)
         mcap_path = Path(kitti_root.perform(context)).expanduser() / sequence / f"{sequence}.mcap"
         command = ["ros2", "bag", "play", str(mcap_path), "--clock", "--rate", "1.0"]
         if loop.perform(context).lower() == "true":
             command.append("--loop")
-        return [ExecuteProcess(cmd=command, name="kitty_player", output="screen")]
+        bag_player = ExecuteProcess(cmd=command, name="kitty_player", output="screen")
+        shutdown_on_bag_exit = RegisterEventHandler(
+            OnProcessExit(
+                target_action=bag_player,
+                on_exit=[EmitEvent(event=Shutdown(reason="MCAP playback finished"))],
+            )
+        )
+        return [bag_player, shutdown_on_bag_exit]
 
     composable_nodes = [
         ComposableNode(
