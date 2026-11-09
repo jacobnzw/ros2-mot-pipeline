@@ -159,20 +159,25 @@ axis. The same event is logged once with both timeline coordinates.
 To export latency, duration, and callback-interval scalar samples to VictoriaMetrics and open Grafana, run:
 
 ```bash
-scripts/analyse.sh runs/<run-id>/recording.rrd
+scripts/analyse.sh runs/<run-id>/recording.rrd \
+  --hw jetson-orin --quant fp16 --seq 0020 --label baseline
 ```
 
 The script writes `latency.csv` beside the recording and, if TrackEval detailed results are present under the same run
 folder, writes `trackeval.csv` there too. It starts the Compose services, waits for them to respond, and imports both
-CSVs into VictoriaMetrics. Latency rows have columns `timestamp_ms,run,stage,value` and become `latency_ms` samples.
+CSVs into VictoriaMetrics. Latency rows have columns
+`timestamp_ms,run,stage,hardware,quantization,sequence,label,value` and become `latency_ms` samples. The `--hw`,
+`--quant`, `--seq`, and `--label` options populate the corresponding metadata labels; they default to empty strings.
 TrackEval rows have columns
-`timestamp_ms,run,tracker,sequence,class,metric,value` and become `trackeval_kpi` samples with run/tracker/sequence/
-class/metric labels. TrackEval timestamps use the newest detailed-results file modification time; score values are
+`timestamp_ms,run,hardware,quantization,label,tracker,sequence,class,metric,value` and become `trackeval_kpi` samples
+with run/hardware/quantization/label/tracker/sequence/class/metric labels. TrackEval timestamps use the newest
+detailed-results file modification time; score values are
 ratios in `[0, 1]`, while count metrics remain counts. The run label defaults to the recording
 directory name; pass an optional second argument to `analyse.sh` to override it. The stage label comes from the Rerun
 entity path (for example, `/detector/inference_latency_ms` becomes `detector_inference`). Counters and other
-non-duration scalars are omitted. You can also run `uv run scripts/rrd_to_csv.py runs/<run-id>/recording.rrd` to export
-only the CSV.
+non-duration scalars are omitted. You can also run
+`uv run scripts/rrd_to_csv.py runs/<run-id>/recording.rrd --hw jetson-orin --quant fp16 --seq 0020 --label baseline`
+to export only the CSV with those labels.
 
 The exporter uses `steady_elapsed` when present, falling back to `ros2_timestamp` for older recordings. It maps elapsed
 time so the final sample is at export time, preserving the spacing between samples and making the recording visible in

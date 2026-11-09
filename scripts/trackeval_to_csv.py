@@ -3,7 +3,6 @@
 import argparse
 import csv
 import math
-import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -107,6 +106,9 @@ def write_kpi_csv(
     output_path: Path,
     run_id: str,
     timestamp_ms: int,
+    hardware: str = "",
+    quantization: str = "",
+    label: str = "",
 ) -> None:
     if not samples:
         raise ValueError("TrackEval results contain no KPI samples")
@@ -120,6 +122,9 @@ def write_kpi_csv(
                 (
                     timestamp_ms,
                     run_id,
+                    hardware,
+                    quantization,
+                    label,
                     sample.tracker,
                     sample.sequence,
                     sample.class_name,
@@ -130,9 +135,7 @@ def write_kpi_csv(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Export TrackEval detailed results as VictoriaMetrics KPI CSV rows."
-    )
+    parser = argparse.ArgumentParser(description="Export TrackEval detailed results as VictoriaMetrics KPI CSV rows.")
     parser.add_argument(
         "results_folder",
         type=Path,
@@ -146,13 +149,16 @@ def main() -> None:
     )
     parser.add_argument(
         "--run-id",
-        help="Run label (default: results folder name)",
+        help="Run ID (default: results folder name)",
     )
     parser.add_argument(
         "--timestamp-ms",
         type=int,
         help="Evaluation timestamp in Unix milliseconds (default: newest detailed file modification time)",
     )
+    parser.add_argument("--hw", default="", help="Hardware label")
+    parser.add_argument("--quant", default="", help="Quantization label")
+    parser.add_argument("--label", default="", help="Additional user-defined label")
     args = parser.parse_args()
 
     results_folder = args.results_folder.expanduser()
@@ -172,12 +178,21 @@ def main() -> None:
             else max(path.stat().st_mtime_ns for path in detailed_files) // 1_000_000
         )
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        write_kpi_csv(samples, output_path, run_id, timestamp_ms)
+        write_kpi_csv(
+            samples,
+            output_path,
+            run_id,
+            timestamp_ms,
+            hardware=args.hw,
+            quantization=args.quant,
+            label=args.label,
+        )
     except (OSError, RuntimeError, ValueError) as error:
         parser.error(str(error))
 
     print(f"Exported {len(samples):,} TrackEval KPI samples to {output_path}")
     print(f"Run label: {run_id}")
+    print(f"Hardware: {args.hw}; quantization: {args.quant}; label: {args.label}")
     print(f"Evaluation timestamp: {timestamp_ms} ms since Unix epoch")
 
 

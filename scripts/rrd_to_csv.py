@@ -77,7 +77,16 @@ def timestamp_to_unix_ms(timestamp_ns: int, min_timestamp_ns: int, max_timestamp
     return now_ms - (max_timestamp_ns - timestamp_ns) // 1_000_000
 
 
-def write_csv(samples: list[Sample], output_path: Path, run_id: str, now_ms: int | None = None) -> None:
+def write_csv(
+    samples: list[Sample],
+    output_path: Path,
+    run_id: str,
+    now_ms: int | None = None,
+    hardware: str = "",
+    quantization: str = "",
+    sequence: str = "",
+    label: str = "",
+) -> None:
     if not samples:
         raise ValueError("recording contains no finite latency or duration scalar samples")
     if not run_id:
@@ -95,6 +104,10 @@ def write_csv(samples: list[Sample], output_path: Path, run_id: str, now_ms: int
                     timestamp_to_unix_ms(sample.timestamp_ns, min_timestamp_ns, max_timestamp_ns, export_time_ms),
                     run_id,
                     sample.stage,
+                    hardware,
+                    quantization,
+                    sequence,
+                    label,
                     sample.value,
                 )
             )
@@ -115,6 +128,10 @@ def main() -> None:
         "--run-id",
         help="Run label (default: recording directory name, or recording filename stem)",
     )
+    parser.add_argument("--hw", default="", help="Hardware label")
+    parser.add_argument("--quant", default="", help="Quantization label")
+    parser.add_argument("--seq", default="", help="Sequence label")
+    parser.add_argument("--label", default="", help="Additional user-defined label")
     args = parser.parse_args()
 
     recording_path = args.recording.expanduser()
@@ -136,12 +153,21 @@ def main() -> None:
     try:
         samples = read_latency_samples(recording_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        write_csv(samples, output_path, run_id)
+        write_csv(
+            samples,
+            output_path,
+            run_id,
+            hardware=args.hw,
+            quantization=args.quant,
+            sequence=args.seq,
+            label=args.label,
+        )
     except (OSError, RuntimeError, ValueError) as error:
         parser.error(str(error))
 
     print(f"Exported {len(samples):,} latency/duration samples to {output_path}")
     print(f"Run label: {run_id}")
+    print(f"Hardware: {args.hw}; quantization: {args.quant}; sequence: {args.seq}; label: {args.label}")
 
 
 if __name__ == "__main__":

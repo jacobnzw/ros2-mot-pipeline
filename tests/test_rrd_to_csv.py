@@ -49,7 +49,16 @@ class RrdToCsvTests(unittest.TestCase):
         ]
         with tempfile.TemporaryDirectory() as directory:
             output_path = Path(directory) / "latency.csv"
-            write_csv(samples, output_path, "run-001", now_ms=1_000_000)
+            write_csv(
+                samples,
+                output_path,
+                "run-001",
+                hardware="jetson",
+                quantization="fp16",
+                sequence="0020",
+                label="baseline",
+                now_ms=1_000_000,
+            )
 
             with output_path.open(newline="", encoding="utf-8") as csv_file:
                 rows = list(csv.reader(csv_file))
@@ -57,20 +66,42 @@ class RrdToCsvTests(unittest.TestCase):
         self.assertEqual(
             rows,
             [
-                ["999900", "run-001", "detector_inference", "8.42"],
-                ["1000000", "run-001", "pipeline_end_to_end", "24.61"],
+                ["999900", "run-001", "detector_inference", "jetson", "fp16", "0020", "baseline", "8.42"],
+                ["1000000", "run-001", "pipeline_end_to_end", "jetson", "fp16", "0020", "baseline", "24.61"],
             ],
         )
 
     def test_csv_escapes_run_labels(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output_path = Path(directory) / "latency.csv"
-            write_csv([Sample(1_000_000_000, "detector_inference", 1.0)], output_path, "run,one")
+            write_csv(
+                [Sample(1_000_000_000, "detector_inference", 1.0)],
+                output_path,
+                "run,one",
+                hardware="Jetson, Orin",
+            )
 
             with output_path.open(newline="", encoding="utf-8") as csv_file:
                 rows = list(csv.reader(csv_file))
 
         self.assertEqual(rows[0][1], "run,one")
+        self.assertEqual(rows[0][3], "Jetson, Orin")
+        self.assertEqual(len(rows[0]), 8)
+
+    def test_additional_labels_default_to_empty_csv_columns(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_path = Path(directory) / "latency.csv"
+            write_csv(
+                [Sample(1_000_000_000, "detector_inference", 1.0)],
+                output_path,
+                "run-001",
+                now_ms=1_000_000,
+            )
+
+            with output_path.open(newline="", encoding="utf-8") as csv_file:
+                row = next(csv.reader(csv_file))
+
+        self.assertEqual(row, ["1000000", "run-001", "detector_inference", "", "", "", "", "1.0"])
 
 
 if __name__ == "__main__":

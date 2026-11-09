@@ -207,11 +207,18 @@ The tracker folder must contain `data/<sequence>.txt`. The CLI selects the reque
 folder, including per-class summary and detailed result files under `bytetrack/`. Using the run folder as the output
 folder keeps the TrackEval results beside `recording.rrd`.
 
-Run `scripts/analyse.sh runs/<run-id>/recording.rrd` to export the RRD latency samples and, when TrackEval detailed
-results are present, write `trackeval.csv` beside `latency.csv` and import both CSVs into VictoriaMetrics. The KPI CSV
-contains one row per TrackEval summary metric, class, and sequence, including TrackEval's `COMBINED` row. Scores remain
-ratios in `[0, 1]`; count metrics remain counts. `scripts/trackeval_to_csv.py runs/<run-id>` can export the KPI CSV
-without importing it.
+Run `scripts/analyse.sh` with the recording path and metadata labels to export the RRD latency samples and, when
+TrackEval detailed results are present, write `trackeval.csv` beside `latency.csv` and import both CSVs into
+VictoriaMetrics:
+
+```bash
+scripts/analyse.sh runs/<run-id>/recording.rrd --hw jetson-orin --quant fp16 --label baseline
+```
+
+The KPI CSV contains one row per TrackEval summary metric, class, and sequence, including TrackEval's `COMBINED` row,
+with the supplied hardware, quantization, and label metadata. Scores remain ratios in `[0, 1]`; count metrics remain
+counts. `scripts/trackeval_to_csv.py runs/<run-id> --hw jetson-orin --quant fp16 --label baseline` can export the KPI
+CSV with these labels without importing it.
 
 Use `--split` for a non-training seqmap and `--classes` to select either or both supported classes.
 

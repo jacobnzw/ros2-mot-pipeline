@@ -5,12 +5,11 @@ set -euo pipefail
 
 # Print usage errors to stderr (>&2), keeping normal output separate.
 usage() {
-  echo "Usage: $0 path/to/recording.rrd [run-id]" >&2
+  echo "Usage: $0 path/to/recording.rrd [run-id] [--hw hardware] [--quant quantization] [--seq sequence] [--label label]" >&2
 }
 
-# $# is the number of command-line arguments. Accept the recording path and an
-# optional run label; [[ ... ]] is Bash's conditional syntax.
-if [[ $# -lt 1 || $# -gt 2 ]]; then
+# Accept the recording path, an optional run label, and optional metric labels.
+if [[ $# -lt 1 ]]; then
   usage
   exit 2
 fi
@@ -26,10 +25,53 @@ if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>
   exit 1
 fi
 
-# Resolve the input to an absolute path, so later commands work from any
-# directory. Quoting "$1" preserves paths containing spaces; -- ends options
-# in case a filename starts with a dash.
-recording_path=$(realpath -- "$1")
+# Keep the first argument as the recording path; parse remaining options before
+# resolving it so metadata options can appear without a positional run label.
+recording_arg=$1
+shift
+run_id=""
+run_id_provided=false
+if [[ $# -gt 0 && $1 != --* ]]; then
+  run_id=$1
+  run_id_provided=true
+  shift
+fi
+
+hw=""
+quant=""
+seq=""
+label=""
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --hw)
+      [[ $# -ge 2 ]] || { usage; exit 2; }
+      hw=$2
+      shift 2
+      ;;
+    --quant)
+      [[ $# -ge 2 ]] || { usage; exit 2; }
+      quant=$2
+      shift 2
+      ;;
+    --seq)
+      [[ $# -ge 2 ]] || { usage; exit 2; }
+      seq=$2
+      shift 2
+      ;;
+    --label)
+      [[ $# -ge 2 ]] || { usage; exit 2; }
+      label=$2
+      shift 2
+      ;;
+    *)
+      echo "Error: unknown argument: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+recording_path=$(realpath -- "$recording_arg")
 if [[ ! -f "$recording_path" ]]; then
   echo "Error: recording file does not exist: $recording_path" >&2
   exit 1
@@ -50,12 +92,12 @@ recording_dir=$(dirname -- "$recording_path")
 # provided explicitly; otherwise use the run directory for recording.rrd or
 # the filename stem for other recording names.
 recording_stem=$(basename -- "${recording_path%.rrd}")
-if [[ $# -eq 2 ]]; then
-  run_id=$2
-elif [[ $recording_stem == recording ]]; then
-  run_id=$(basename -- "$recording_dir")
-else
-  run_id=$recording_stem
+if [[ $run_id_provided == false ]]; then
+  if [[ $recording_stem == recording ]]; then
+    run_id=$(basename -- "$recording_dir")
+  else
+    run_id=$recording_stem
+  fi
 fi
 # A blank second argument would create unlabeled/misleading time series.
 if [[ -z $run_id ]]; then
@@ -72,7 +114,8 @@ kpi_csv_path="$recording_dir/trackeval.csv"
 cd -- "$repo_root"
 echo "==> Exporting latency samples from $recording_path (run: $run_id)"
 uv run --project "$repo_root" python "$repo_root/scripts/rrd_to_csv.py" \
-  "$recording_path" --output "$csv_path" --run-id "$run_id"
+  "$recording_path" --output "$csv_path" --run-id "$run_id" \
+  --hw "$hw" --quant "$quant" --seq "$seq" --label "$label"
 
 # TrackEval is an optional post-processing step. When its detailed result files
 # are present in the run folder, export their per-sequence and combined KPIs.
@@ -80,7 +123,8 @@ trackeval_file=$(find "$recording_dir" -type f -name '*_detailed.csv' -print -qu
 if [[ -n $trackeval_file ]]; then
   echo "==> Exporting TrackEval KPIs from $recording_dir"
   uv run --project "$repo_root" python "$repo_root/scripts/trackeval_to_csv.py" \
-    "$recording_dir" --output "$kpi_csv_path" --run-id "$run_id"
+    "$recording_dir" --output "$kpi_csv_path" --run-id "$run_id" \
+    --hw "$hw" --quant "$quant" --label "$label"
 else
   echo "==> No TrackEval detailed results found; skipping KPI export"
 fi
@@ -113,13 +157,13 @@ wait_for_service "http://127.0.0.1:8428/health" "VictoriaMetrics"
 wait_for_service "http://127.0.0.1:3000/api/health" "Grafana"
 
 # POST the CSV to the VictoriaMetric's import endpoint. In the format mapping, each number is a
-# one-based CSV column: timestamp, run label, stage label, and metric/value.
+# one-based CSV column: timestamp, run/stage labels, optional metadata labels, and metric/value.
 # @file tells curl to read the request body from that file.
 echo "==> Importing CSV into VictoriaMetrics"
 curl --silent --show-error --fail-with-body \
   --request POST \
   --data-binary "@$csv_path" \
-  "http://127.0.0.1:8428/api/v1/import/csv?format=1:time:unix_ms,2:label:run,3:label:stage,4:metric:latency_ms"
+  "http://127.0.0.1:8428/api/v1/import/csv?format=1:time:unix_ms,2:label:run,3:label:stage,4:label:hardware,5:label:quantization,6:label:sequence,7:label:label,8:metric:latency_ms"
 echo
 
 if [[ -n $trackeval_file && -f $kpi_csv_path ]]; then
@@ -127,7 +171,7 @@ if [[ -n $trackeval_file && -f $kpi_csv_path ]]; then
   curl --silent --show-error --fail-with-body \
     --request POST \
     --data-binary "@$kpi_csv_path" \
-    "http://127.0.0.1:8428/api/v1/import/csv?format=1:time:unix_ms,2:label:run,3:label:tracker,4:label:sequence,5:label:class,6:label:metric,7:metric:trackeval_kpi"
+    "http://127.0.0.1:8428/api/v1/import/csv?format=1:time:unix_ms,2:label:run,3:label:hardware,4:label:quantization,5:label:label,6:label:tracker,7:label:sequence,8:label:class,9:label:metric,10:metric:trackeval_kpi"
   echo
 fi
 

@@ -39,13 +39,34 @@ class TrackEvalToCsvTests(unittest.TestCase):
         sample = KpiSample("bytetrack", "0019", "car", "HOTA", 0.49423)
         with tempfile.TemporaryDirectory() as directory:
             output_path = Path(directory) / "trackeval.csv"
-            write_kpi_csv([sample], output_path, "run-001", timestamp_ms=1_798_876_800_000)
+            write_kpi_csv(
+                [sample],
+                output_path,
+                "run-001",
+                timestamp_ms=1_798_876_800_000,
+                hardware="jetson-orin",
+                quantization="fp16",
+                label="baseline",
+            )
             with output_path.open(newline="", encoding="utf-8") as csv_file:
                 rows = list(csv.reader(csv_file))
 
         self.assertEqual(
             rows,
-            [["1798876800000", "run-001", "bytetrack", "0019", "car", "HOTA", "0.49423"]],
+            [["1798876800000", "run-001", "jetson-orin", "fp16", "baseline", "bytetrack", "0019", "car", "HOTA", "0.49423"]],
+        )
+
+    def test_metadata_labels_default_to_empty_columns(self) -> None:
+        sample = KpiSample("bytetrack", "0019", "car", "HOTA", 0.5)
+        with tempfile.TemporaryDirectory() as directory:
+            output_path = Path(directory) / "trackeval.csv"
+            write_kpi_csv([sample], output_path, "run-001", timestamp_ms=1_798_876_800_000)
+            with output_path.open(newline="", encoding="utf-8") as csv_file:
+                row = next(csv.reader(csv_file))
+
+        self.assertEqual(
+            row,
+            ["1798876800000", "run-001", "", "", "", "bytetrack", "0019", "car", "HOTA", "0.5"],
         )
 
     def test_rejects_non_finite_trackeval_values(self) -> None:
