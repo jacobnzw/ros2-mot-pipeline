@@ -127,6 +127,13 @@ timeout 10m ros2 launch launch/detector_test.launch.py loop:=true
 ```
 
 Playback then continues indefinitely; stop it with Ctrl+C. The default `loop:=false` plays the bag once.
+The launch defaults to sequence `0019` under `data/kitti/left_color/training/image_02_mcap`. Select another sequence
+or MCAP root with ROS 2 launch arguments (which use `name:=value` syntax rather than `--name` flags):
+
+```bash
+ros2 launch launch/detector_test.launch.py seq:=0020 \
+  kitti_root:=/path/to/image_02_mcap
+```
 
 The C++ SDK fetched by CMake writes Rerun data, but does not install the standalone Rerun viewer/CLI. Install the viewer
 separately, for example with `uv tool install rerun-sdk` (see the

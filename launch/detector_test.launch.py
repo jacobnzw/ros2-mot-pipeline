@@ -1,11 +1,11 @@
 from datetime import datetime, timezone
+from pathlib import Path
 
+from launch import LaunchContext, LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
-
-from launch import LaunchContext, LaunchDescription
 
 log_level = LaunchConfiguration("log_level")
 log_input_image = LaunchConfiguration("log_input_image")
@@ -14,14 +14,15 @@ log_tracks = LaunchConfiguration("log_tracks")
 thread_num = LaunchConfiguration("thread_num")
 recording_path = LaunchConfiguration("recording_path")
 loop = LaunchConfiguration("loop")
+seq = LaunchConfiguration("seq")
+kitti_root = LaunchConfiguration("kitti_root")
 
 
 def generate_launch_description():
-
-    mcap_path = "data/kitti/left_color/mcap/0019/0019.mcap"
-
     def create_bag_player(context: LaunchContext) -> list[ExecuteProcess]:
-        command = ["ros2", "bag", "play", mcap_path, "--clock", "--rate", "1.0"]
+        sequence = seq.perform(context)
+        mcap_path = Path(kitti_root.perform(context)).expanduser() / sequence / f"{sequence}.mcap"
+        command = ["ros2", "bag", "play", str(mcap_path), "--clock", "--rate", "1.0"]
         if loop.perform(context).lower() == "true":
             command.append("--loop")
         return [ExecuteProcess(cmd=command, name="kitty_player", output="screen")]
@@ -129,8 +130,18 @@ def generate_launch_description():
                 description="Whether to loop MCAP playback indefinitely.",
             ),
             DeclareLaunchArgument(
+                "seq",
+                default_value="0019",
+                description="KITTI sequence number to play.",
+            ),
+            DeclareLaunchArgument(
+                "kitti_root",
+                default_value="data/kitti/left_color/training/image_02_mcap",
+                description="Root directory containing the sequence MCAP folders.",
+            ),
+            DeclareLaunchArgument(
                 "recording_path",
-                default_value=(  # TODO: accept user's label; hardcode path as runs/{datetime}_{label}/recording.rrd
+                default_value=(  # TODO: accept user's label; hardcode path as runs/{datetime}_{seq}_{label}/recording.rrd
                     f"runs/{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}_yolo11n_kitti-0019/recording.rrd"
                 ),
                 description="Path for the Rerun recording. The parent directory is created automatically.",
