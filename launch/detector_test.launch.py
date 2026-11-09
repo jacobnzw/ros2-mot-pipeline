@@ -23,7 +23,8 @@ timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 recording_path = PathJoinSubstitution(
     [
         "runs",
-        [TextSubstitution(text=f"{timestamp}_"), seq, TextSubstitution(text="_"), label],
+        label,
+        [TextSubstitution(text=f"{timestamp}_"), seq],
         "recording.rrd",
     ]
 )
@@ -159,6 +160,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "label",
+                default_value="default",
                 description="User-provided label included in the Rerun recording directory name.",
             ),
             OpaqueFunction(function=create_bag_player),
