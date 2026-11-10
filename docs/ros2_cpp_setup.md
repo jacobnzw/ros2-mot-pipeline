@@ -137,12 +137,25 @@ ros2 launch launch/detector_test.launch.py seq:=0020 \
   label:=baseline
 ```
 
+To run every sequence directory in an MCAP root sequentially, use the batch runner:
+
+```bash
+uv run scripts/run_kitti_sequences.py \
+  --thread-num 1 --precision fp16 --label baseline
+```
+
+`--kitti-root` defaults to `data/kitti/left_color/training/image_02_mcap`; each sequence folder must contain
+`<sequence>/<sequence>.mcap`. Optionally pass `--seq 0019,0020` to run only the listed sequences. The batch runner
+detects Jetson or RTX 3090 hardware, writes
+`runs/<label>/metadata.yaml` with the run configuration, and stops if a sequence launch fails. The `precision` launch
+argument is currently informational and does not change the detector model path.
+
 The C++ SDK fetched by CMake writes Rerun data, but does not install the standalone Rerun viewer/CLI. Install the viewer
 separately, for example with `uv tool install rerun-sdk` (see the
 [Rerun viewer installation guide](https://rerun.io/docs/getting-started/install-rerun/viewer)). After running the
 detector and tracker, their scalar metrics are written to a unique run directory under `runs/`, for example
-`runs/<datetime>_0020_baseline/recording.rrd`. `detector_test.launch.py` requires a `label:=...` argument and creates the
-recording directory automatically using the timestamp, selected sequence, and label. Open the resulting file with
+`runs/baseline/<datetime>_0020/recording.rrd`. `detector_test.launch.py` accepts a `label:=...` argument and creates the
+recording directory automatically using the label, timestamp, and selected sequence. Open the resulting file with
 `rerun runs/<run-id>/recording.rrd`. The recording includes detector inference and callback intervals, estimated
 cumulative frame drops, ByteTrack association latency and active-track count, and image-stamp-to-tracker-output latency.
 Frame-drop estimates use the detector's

@@ -54,7 +54,7 @@ def generate_launch_description():
             parameters=[
                 {
                     "use_sim_time": True,
-                    "model_path": "models/yolo/yolo11n.onnx",
+                    "model_path": "models/yolo/yolo11n_fp32.onnx",
                     "image_topic": "/camera/image_raw/compressed",
                     "detection_topic": "/detections",
                     "log_input_image": log_input_image,
@@ -141,6 +141,13 @@ def generate_launch_description():
                 "thread_num",
                 default_value="1",
                 description="Number of threads to use. If > 1 multi-threaded executor is used.",
+            ),
+            # TODO: hook up to model path selection when quantization script finished.
+            DeclareLaunchArgument(
+                "precision",
+                default_value="fp32",
+                choices=["fp32", "fp16", "int8"],
+                description="Detector model export precision (currently informational; does not select a model).",
             ),
             DeclareLaunchArgument(
                 "loop",
