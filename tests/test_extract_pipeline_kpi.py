@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.rrd_to_csv import (
+from scripts.extract_pipeline_kpi import (
     ROS2_TIMESTAMP_COLUMN,
     STEADY_ELAPSED_COLUMN,
     Sample,
