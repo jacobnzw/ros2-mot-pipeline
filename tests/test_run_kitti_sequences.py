@@ -2,10 +2,14 @@ import argparse
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import yaml
 
 from scripts.run_kitti_sequences import (
+    count_mcap_frames,
+    create_trackeval_gt,
     discover_sequences,
     identify_hardware,
     launch_command,
@@ -67,8 +71,23 @@ class RunKittiSequencesTests(unittest.TestCase):
 
     def test_writes_metadata_with_expected_fields(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            metadata = Path(directory) / "metadata.yaml"
-            write_metadata(metadata, 4, "rtx3090", "fp16", "nightly-run")
+            root = Path(directory)
+            metadata = root / "metadata.yaml"
+            kitti_root = Path("/dataset/mcaps")
+            kitti_gt = Path("/dataset/training/label_02")
+            trackeval_gt = root / "runs" / "nightly-run" / "eval"
+            trackeval_seqmap = trackeval_gt / "evaluate_tracking.seqmap.training"
+            write_metadata(
+                metadata,
+                kitti_root,
+                kitti_gt,
+                trackeval_gt,
+                trackeval_seqmap,
+                4,
+                "rtx3090",
+                "fp16",
+                "nightly-run",
+            )
 
             self.assertEqual(
                 yaml.safe_load(metadata.read_text(encoding="utf-8")),
@@ -78,6 +97,10 @@ class RunKittiSequencesTests(unittest.TestCase):
                     "precision": "fp16",
                     "label": "nightly-run",
                     "label_dir": "runs/nightly-run",
+                    "kitti_gt": str(kitti_gt),
+                    "kitti_root": str(kitti_root),
+                    "trackeval_gt": str(trackeval_gt.resolve()),
+                    "trackeval_seqmap": str(trackeval_seqmap.resolve()),
                 },
             )
 
@@ -99,11 +122,64 @@ class RunKittiSequencesTests(unittest.TestCase):
     def test_metadata_quotes_yaml_special_characters(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             metadata = Path(directory) / "metadata.yaml"
-            write_metadata(metadata, 1, "jetson", "fp16", 'baseline: "nightly"')
+            write_metadata(
+                metadata,
+                Path("/dataset/mcaps"),
+                Path("/dataset/training/label_02"),
+                Path("/runs/nightly/eval"),
+                Path("/runs/nightly/eval/evaluate_tracking.seqmap.training"),
+                1,
+                "jetson",
+                "fp16",
+                'baseline: "nightly"',
+            )
 
             self.assertEqual(
                 yaml.safe_load(metadata.read_text(encoding="utf-8"))["label"],
                 'baseline: "nightly"',
+            )
+
+    def test_counts_image_messages_in_mcap(self) -> None:
+        reader = Mock()
+        reader.__enter__ = Mock(return_value=reader)
+        reader.__exit__ = Mock(return_value=False)
+        reader.connections = [
+            SimpleNamespace(topic="/camera/image_raw/compressed", msgtype="sensor_msgs/msg/CompressedImage"),
+            SimpleNamespace(topic="/tf", msgtype="tf2_msgs/msg/TFMessage"),
+        ]
+        reader.messages.return_value = iter((object(), object(), object()))
+
+        with patch("scripts.run_kitti_sequences.Reader", return_value=reader):
+            self.assertEqual(count_mcap_frames(Path("/dataset/0001.mcap")), 3)
+
+        reader.messages.assert_called_once_with(connections=[reader.connections[0]])
+
+    def test_creates_run_specific_trackeval_gt_and_seqmap(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            label_dir = root / "dataset" / "label_02"
+            label_dir.mkdir(parents=True)
+            sequences = []
+            for name in ("0001", "0019"):
+                sequence_dir = root / "mcaps" / name
+                sequence_dir.mkdir(parents=True)
+                (sequence_dir / f"{name}.mcap").touch()
+                sequences.append(sequence_dir)
+
+            eval_folder = root / "runs" / "nightly" / "eval"
+            with patch(
+                "scripts.run_kitti_sequences.count_mcap_frames",
+                side_effect=[447, 1059],
+            ):
+                seqmap_path = create_trackeval_gt(eval_folder, label_dir, sequences)
+
+            self.assertEqual(seqmap_path, eval_folder / "evaluate_tracking.seqmap.training")
+            self.assertTrue((eval_folder / "label_02").is_symlink())
+            self.assertEqual((eval_folder / "label_02").resolve(), label_dir)
+            self.assertEqual(
+                seqmap_path.read_text(encoding="utf-8"),
+                "0001 image_02/0001 000000 447\n"
+                "0019 image_02/0019 000000 1059\n",
             )
 
 

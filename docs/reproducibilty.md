@@ -215,6 +215,24 @@ The tracker folder must contain `data/<sequence>.txt`. The CLI selects the reque
 folder, including per-class summary and detailed result files under `bytetrack/`. Using the run folder as the output
 folder keeps the TrackEval results beside `recording.rrd`.
 
+### Hamilton evaluation pipeline
+
+After `scripts/run_kitti_sequences.py` has created the recordings and `metadata.yaml`, run the Hamilton DAG for the
+whole run:
+
+```shell
+uv run scripts/evaluate_pipeline.py runs/<run-id>/metadata.yaml
+```
+
+`run_kitti_sequences.py` creates `runs/<run-id>/eval/label_02` as a symlink to the configured KITTI labels and generates
+`runs/<run-id>/eval/evaluate_tracking.seqmap.training`. It counts image messages in each selected MCAP for the seqmap's
+frame count and records both paths in `metadata.yaml`. The pipeline runs one parallel task per recording to extract its
+pipeline KPI CSV and ByteTrack prediction, evaluates the selected prediction sequences once with TrackEval using the
+run-specific `trackeval_gt` folder, then exports tracker KPIs. By default, at most two per-sequence tasks run
+concurrently; use `--max-workers` to change this limit. Outputs are written to
+`runs/<run-id>/eval/pipeline/kpi_<sequence>.csv`, `runs/<run-id>/eval/trackers/bytetrack/`, and
+`runs/<run-id>/eval/tracker_kpi.csv`. The VictoriaMetrics/Grafana ingestion script remains a separate step.
+
 Run `scripts/analyse.sh` with the recording path and metadata labels to export the RRD latency samples and, when
 TrackEval detailed results are present, write `trackeval.csv` beside `latency.csv` and import both CSVs into
 VictoriaMetrics:
