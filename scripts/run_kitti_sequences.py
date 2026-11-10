@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 DEFAULT_KITTI_ROOT = Path("data/kitti/left_color/training/image_02_mcap")
+DEFAULT_KITTI_GT = Path("data/kitti/left_color/training/label_02")
 
 
 def positive_int(value: str) -> int:
@@ -90,6 +91,8 @@ def discover_sequences(kitti_root: Path, requested_sequences: list[str] | None =
 
 def write_metadata(
     metadata_path: Path,
+    kitti_root: Path,
+    kitti_gt: Path,
     thread_num: int,
     hardware: str,
     precision: str,
@@ -101,6 +104,8 @@ def write_metadata(
         "precision": precision,
         "label": label,
         "label_dir": f"runs/{label}",
+        "kitti_gt": f"{kitti_gt}",
+        "kitti_root": f"{kitti_root}",
     }
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
     with metadata_path.open("w", encoding="utf-8") as metadata_file:
@@ -129,6 +134,9 @@ def launch_command(
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the detector launch sequentially for each KITTI sequence MCAP.")
     parser.add_argument("--kitti-root", type=Path, default=DEFAULT_KITTI_ROOT, help="Root containing sequence folders")
+    parser.add_argument(
+        "--kitti-gt", type=Path, default=DEFAULT_KITTI_GT, help="Root containing ground truth TXT file per sequence."
+    )
     parser.add_argument("--thread-num", type=positive_int, required=True, help="Detector container thread count")
     parser.add_argument("--precision", required=True, help="Detector model export precision, e.g. fp32 or fp16")
     parser.add_argument("--label", required=True, help="Run label used for recording and metadata directories")
@@ -143,6 +151,7 @@ def main() -> int:
         parser.error("--label must be a non-empty directory name without path separators")
 
     kitti_root = args.kitti_root.expanduser().resolve()
+    kitti_gt = args.kitti_gt.expanduser().resolve()
     try:
         sequences = discover_sequences(kitti_root, args.seq)
         hardware = detect_hardware()
@@ -152,7 +161,7 @@ def main() -> int:
     repository_root = Path(__file__).resolve().parents[1]
     metadata_path = repository_root / "runs" / args.label / "metadata.yaml"
     try:
-        write_metadata(metadata_path, args.thread_num, hardware, args.precision, args.label)
+        write_metadata(metadata_path, kitti_root, kitti_gt, args.thread_num, hardware, args.precision, args.label)
     except OSError as error:
         parser.error(f"could not write metadata: {error}")
 
