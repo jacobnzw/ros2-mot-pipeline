@@ -8,7 +8,30 @@ from pathlib import Path
 import trackeval
 
 
-def read_sequence_entry(seqmap_path: Path, sequence: str) -> str:
+def parse_sequences(values: list[str] | None) -> list[str] | None:
+    if values is None:
+        return None
+
+    sequences = [sequence.strip() for value in values for sequence in value.split(",")]
+    if not sequences or any(not sequence for sequence in sequences):
+        raise ValueError("sequence list must contain non-empty sequence numbers")
+    if len(sequences) != len(set(sequences)):
+        raise ValueError("sequence numbers must not be repeated")
+    return sequences
+
+
+def discover_tracker_sequences(tracker_folder: Path) -> list[str]:
+    data_folder = tracker_folder / "data"
+    if not data_folder.is_dir():
+        raise ValueError(f"tracker data folder does not exist: {data_folder}")
+
+    sequences = sorted(path.stem for path in data_folder.glob("*.txt") if path.is_file())
+    if not sequences:
+        raise ValueError(f"no tracker sequence .txt files found in {data_folder}")
+    return sequences
+
+
+def read_sequence_entries(seqmap_path: Path, sequences: list[str]) -> list[str]:
     if not seqmap_path.is_file():
         raise ValueError(f"TrackEval seqmap does not exist: {seqmap_path}")
 
@@ -19,40 +42,79 @@ def read_sequence_entry(seqmap_path: Path, sequence: str) -> str:
     except csv.Error as error:
         raise ValueError(f"could not parse TrackEval seqmap: {seqmap_path}") from error
 
-    matches = [row for row in rows if row and row[0] == sequence]
-    if not matches:
-        raise ValueError(f"sequence {sequence!r} is not listed in {seqmap_path}")
-    if len(matches) > 1:
-        raise ValueError(f"sequence {sequence!r} appears more than once in {seqmap_path}")
-    if len(matches[0]) < 4:
-        raise ValueError(f"seqmap entry for {sequence!r} must have at least four columns")
-    return " ".join(matches[0])
+    rows_by_sequence: dict[str, list[list[str]]] = {}
+    for row in rows:
+        if row:
+            rows_by_sequence.setdefault(row[0], []).append(row)
+
+    entries = []
+    for sequence in sequences:
+        matches = rows_by_sequence.get(sequence, [])
+        if not matches:
+            raise ValueError(f"sequence {sequence!r} is not listed in {seqmap_path}")
+        if len(matches) > 1:
+            raise ValueError(f"sequence {sequence!r} appears more than once in {seqmap_path}")
+        if len(matches[0]) < 4:
+            raise ValueError(f"seqmap entry for {sequence!r} must have at least four columns")
+        entries.append(" ".join(matches[0]))
+    return entries
+
+
+def validate_inputs(
+    sequences: list[str] | None,
+    gt_folder: Path,
+    tracker_folder: Path,
+    split: str,
+) -> tuple[list[str], Path]:
+    if not tracker_folder.is_dir():
+        raise ValueError(f"tracker folder does not exist: {tracker_folder}")
+    sequences = sequences if sequences is not None else discover_tracker_sequences(tracker_folder)
+    if not sequences:
+        raise ValueError("at least one sequence is required")
+
+    tracker_data = tracker_folder / "data"
+    gt_labels = gt_folder / "label_02"
+    if not gt_labels.is_dir():
+        raise ValueError(f"KITTI ground-truth label folder does not exist: {gt_labels}")
+
+    missing_tracker_files = [
+        tracker_data / f"{sequence}.txt" for sequence in sequences if not (tracker_data / f"{sequence}.txt").is_file()
+    ]
+    if missing_tracker_files:
+        raise ValueError("tracker result file(s) do not exist: " + ", ".join(map(str, missing_tracker_files)))
+
+    missing_gt_files = [
+        gt_labels / f"{sequence}.txt" for sequence in sequences if not (gt_labels / f"{sequence}.txt").is_file()
+    ]
+    if missing_gt_files:
+        raise ValueError("KITTI ground-truth label file(s) do not exist: " + ", ".join(map(str, missing_gt_files)))
+
+    return sequences, gt_labels
 
 
 def run_trackeval(
-    sequence: str,
+    sequences: list[str] | None,
     gt_folder: Path,
     tracker_folder: Path,
     output_folder: Path,
     split: str,
     classes: list[str],
 ) -> None:
+    sequences, gt_labels = validate_inputs(
+        sequences=sequences,
+        gt_folder=gt_folder,
+        tracker_folder=tracker_folder,
+        split=split,
+    )
+
     seqmap_name = f"evaluate_tracking.seqmap.{split}"
-    seqmap_entry = read_sequence_entry(gt_folder / seqmap_name, sequence)
-    gt_labels = gt_folder / "label_02"
-    tracker_file = tracker_folder / "data" / f"{sequence}.txt"
-    if not gt_labels.is_dir():
-        raise ValueError(f"KITTI ground-truth label folder does not exist: {gt_labels}")
-    if not (gt_labels / f"{sequence}.txt").is_file():
-        raise ValueError(f"KITTI ground-truth labels do not exist for sequence {sequence}: {gt_labels}")
-    if not tracker_file.is_file():
-        raise ValueError(f"tracker result does not exist for sequence {sequence}: {tracker_file}")
+    seqmap_entries = read_sequence_entries(gt_folder / seqmap_name, sequences)
 
     output_folder.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="mot-trackeval-") as temp_dir:
         sequence_gt_folder = Path(temp_dir)
         (sequence_gt_folder / "label_02").symlink_to(gt_labels.resolve(), target_is_directory=True)
-        (sequence_gt_folder / seqmap_name).write_text(seqmap_entry + "\n", encoding="utf-8")
+        (sequence_gt_folder / seqmap_name).write_text("\n".join(seqmap_entries) + "\n", encoding="utf-8")
 
         dataset_config = {
             "GT_FOLDER": str(sequence_gt_folder),
@@ -81,9 +143,13 @@ def run_trackeval(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Evaluate one KITTI tracking sequence with TrackEval (car and pedestrian classes)."
+        description="Evaluate KITTI tracking sequences with TrackEval (car and pedestrian classes)."
     )
-    parser.add_argument("--sequence", required=True, help="KITTI sequence ID, e.g. 0019")
+    parser.add_argument(
+        "--sequence",
+        nargs="+",
+        help="Sequence IDs to evaluate (space- or comma-separated; default: all tracker data/<sequence>.txt files)",
+    )
     parser.add_argument(
         "--gt-folder",
         required=True,
@@ -117,8 +183,9 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
+        sequences = parse_sequences(args.sequence)
         run_trackeval(
-            sequence=args.sequence,
+            sequences=sequences,
             gt_folder=args.gt_folder.expanduser().resolve(),
             tracker_folder=args.tracker_folder.expanduser().resolve(),
             output_folder=args.output_folder.expanduser(),

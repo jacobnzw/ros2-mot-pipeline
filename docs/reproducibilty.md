@@ -194,10 +194,18 @@ Running this will produce the prediction for sequence `0019`
 uv run scripts/mot_bench.py --kitti-seq data/kitti/left_color/training/image_02/0019
 ```
 
-Evaluate one sequence with TrackEval (the KITTI `Kitti2DBox` implementation supports only `car` and `pedestrian`):
+TrackEval evaluates every sequence with a `.txt` prediction file in the tracker's `data/` folder by default. To evaluate only selected sequences, pass their IDs as a space- or comma-separated list. The KITTI `Kitti2DBox` implementation supports only `car` and `pedestrian`.
 ```shell
 uv run scripts/run_trackeval.py \
-  --sequence 0019 \
+  --gt-folder data/kitti/left_color/training \
+  --tracker-folder data/kitti/trackers/bytetrack \
+  --output-folder runs/<run-id>
+```
+
+For an explicit sequence selection:
+```shell
+uv run scripts/run_trackeval.py \
+  --sequence 0018 0019 \
   --gt-folder data/kitti/left_color/training \
   --tracker-folder data/kitti/trackers/bytetrack \
   --output-folder runs/<run-id>
