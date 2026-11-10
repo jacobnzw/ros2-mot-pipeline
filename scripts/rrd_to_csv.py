@@ -83,7 +83,7 @@ def write_csv(
     run_id: str,
     now_ms: int | None = None,
     hardware: str = "",
-    quantization: str = "",
+    precision: str = "",
     sequence: str = "",
     label: str = "",
 ) -> None:
@@ -105,7 +105,7 @@ def write_csv(
                     run_id,
                     sample.stage,
                     hardware,
-                    quantization,
+                    precision,
                     sequence,
                     label,
                     sample.value,
@@ -129,7 +129,7 @@ def main() -> None:
         help="Run label (default: recording directory name, or recording filename stem)",
     )
     parser.add_argument("--hw", default="", help="Hardware label")
-    parser.add_argument("--quant", default="", help="Quantization label")
+    parser.add_argument("--precision", default="", help="Precision label")
     parser.add_argument("--seq", default="", help="Sequence label")
     parser.add_argument("--label", default="", help="Additional user-defined label")
     args = parser.parse_args()
@@ -140,9 +140,7 @@ def main() -> None:
     if recording_path.suffix.lower() != ".rrd":
         parser.error(f"expected a .rrd recording: {recording_path}")
 
-    output_path = (
-        args.output.expanduser() if args.output else recording_path.with_name("latency.csv")
-    )
+    output_path = args.output.expanduser() if args.output else recording_path.with_name("latency.csv")
     if output_path.resolve() == recording_path.resolve():
         parser.error("output CSV must not overwrite the input recording")
 
@@ -158,7 +156,7 @@ def main() -> None:
             output_path,
             run_id,
             hardware=args.hw,
-            quantization=args.quant,
+            precision=args.precision,
             sequence=args.seq,
             label=args.label,
         )
@@ -167,7 +165,7 @@ def main() -> None:
 
     print(f"Exported {len(samples):,} latency/duration samples to {output_path}")
     print(f"Run label: {run_id}")
-    print(f"Hardware: {args.hw}; quantization: {args.quant}; sequence: {args.seq}; label: {args.label}")
+    print(f"Hardware: {args.hw}; precision: {args.precision}; sequence: {args.seq}; label: {args.label}")
 
 
 if __name__ == "__main__":

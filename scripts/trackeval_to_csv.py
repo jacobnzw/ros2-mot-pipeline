@@ -107,7 +107,7 @@ def write_kpi_csv(
     run_id: str,
     timestamp_ms: int,
     hardware: str = "",
-    quantization: str = "",
+    precision: str = "",
     label: str = "",
 ) -> None:
     if not samples:
@@ -123,7 +123,7 @@ def write_kpi_csv(
                     timestamp_ms,
                     run_id,
                     hardware,
-                    quantization,
+                    precision,
                     label,
                     sample.tracker,
                     sample.sequence,
@@ -157,7 +157,7 @@ def main() -> None:
         help="Evaluation timestamp in Unix milliseconds (default: newest detailed file modification time)",
     )
     parser.add_argument("--hw", default="", help="Hardware label")
-    parser.add_argument("--quant", default="", help="Quantization label")
+    parser.add_argument("--precision", default="", help="Precision label")
     parser.add_argument("--label", default="", help="Additional user-defined label")
     args = parser.parse_args()
 
@@ -184,7 +184,7 @@ def main() -> None:
             run_id,
             timestamp_ms,
             hardware=args.hw,
-            quantization=args.quant,
+            precision=args.precision,
             label=args.label,
         )
     except (OSError, RuntimeError, ValueError) as error:
@@ -192,7 +192,7 @@ def main() -> None:
 
     print(f"Exported {len(samples):,} TrackEval KPI samples to {output_path}")
     print(f"Run label: {run_id}")
-    print(f"Hardware: {args.hw}; quantization: {args.quant}; label: {args.label}")
+    print(f"Hardware: {args.hw}; precision: {args.precision}; label: {args.label}")
     print(f"Evaluation timestamp: {timestamp_ms} ms since Unix epoch")
 
 

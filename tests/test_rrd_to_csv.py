@@ -54,7 +54,7 @@ class RrdToCsvTests(unittest.TestCase):
                 output_path,
                 "run-001",
                 hardware="jetson",
-                quantization="fp16",
+                precision="fp16",
                 sequence="0020",
                 label="baseline",
                 now_ms=1_000_000,

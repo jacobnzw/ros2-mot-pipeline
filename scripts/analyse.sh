@@ -5,7 +5,7 @@ set -euo pipefail
 
 # Print usage errors to stderr (>&2), keeping normal output separate.
 usage() {
-  echo "Usage: $0 path/to/recording.rrd [run-id] [--hw hardware] [--quant quantization] [--seq sequence] [--label label]" >&2
+  echo "Usage: $0 path/to/recording.rrd [run-id] [--hw hardware] [--precision precision] [--seq sequence] [--label label]" >&2
 }
 
 # Accept the recording path, an optional run label, and optional metric labels.
@@ -163,7 +163,7 @@ echo "==> Importing CSV into VictoriaMetrics"
 curl --silent --show-error --fail-with-body \
   --request POST \
   --data-binary "@$csv_path" \
-  "http://127.0.0.1:8428/api/v1/import/csv?format=1:time:unix_ms,2:label:run,3:label:stage,4:label:hardware,5:label:quantization,6:label:sequence,7:label:label,8:metric:latency_ms"
+  "http://127.0.0.1:8428/api/v1/import/csv?format=1:time:unix_ms,2:label:run,3:label:stage,4:label:hardware,5:label:precision,6:label:sequence,7:label:label,8:metric:latency_ms"
 echo
 
 if [[ -n $trackeval_file && -f $kpi_csv_path ]]; then
@@ -171,7 +171,7 @@ if [[ -n $trackeval_file && -f $kpi_csv_path ]]; then
   curl --silent --show-error --fail-with-body \
     --request POST \
     --data-binary "@$kpi_csv_path" \
-    "http://127.0.0.1:8428/api/v1/import/csv?format=1:time:unix_ms,2:label:run,3:label:hardware,4:label:quantization,5:label:label,6:label:tracker,7:label:sequence,8:label:class,9:label:metric,10:metric:trackeval_kpi"
+    "http://127.0.0.1:8428/api/v1/import/csv?format=1:time:unix_ms,2:label:run,3:label:hardware,4:label:precision,5:label:label,6:label:tracker,7:label:sequence,8:label:class,9:label:metric,10:metric:trackeval_kpi"
   echo
 fi
 

@@ -45,7 +45,7 @@ class TrackEvalToCsvTests(unittest.TestCase):
                 "run-001",
                 timestamp_ms=1_798_876_800_000,
                 hardware="jetson-orin",
-                quantization="fp16",
+                precision="fp16",
                 label="baseline",
             )
             with output_path.open(newline="", encoding="utf-8") as csv_file:
@@ -53,7 +53,20 @@ class TrackEvalToCsvTests(unittest.TestCase):
 
         self.assertEqual(
             rows,
-            [["1798876800000", "run-001", "jetson-orin", "fp16", "baseline", "bytetrack", "0019", "car", "HOTA", "0.49423"]],
+            [
+                [
+                    "1798876800000",
+                    "run-001",
+                    "jetson-orin",
+                    "fp16",
+                    "baseline",
+                    "bytetrack",
+                    "0019",
+                    "car",
+                    "HOTA",
+                    "0.49423",
+                ]
+            ],
         )
 
     def test_metadata_labels_default_to_empty_columns(self) -> None:
@@ -75,16 +88,53 @@ class TrackEvalToCsvTests(unittest.TestCase):
             tracker_folder.mkdir()
             detailed_file = tracker_folder / "car_detailed.csv"
             detailed_file.write_text(
-                "seq," + ",".join(
+                "seq,"
+                + ",".join(
                     [
-                        "HOTA___AUC", "DetA___AUC", "AssA___AUC", "DetRe___AUC", "DetPr___AUC",
-                        "AssRe___AUC", "AssPr___AUC", "LocA___AUC", "OWTA___AUC",
-                        "HOTA(0)", "LocA(0)", "HOTALocA(0)", "MOTA", "MOTP", "MODA", "CLR_Re",
-                        "CLR_Pr", "MTR", "PTR", "MLR", "CLR_TP", "CLR_FN", "CLR_FP", "IDSW",
-                        "MT", "PT", "ML", "Frag", "sMOTA", "IDF1", "IDR", "IDP", "IDTP",
-                        "IDFN", "IDFP", "Dets", "GT_Dets", "IDs", "GT_IDs",
+                        "HOTA___AUC",
+                        "DetA___AUC",
+                        "AssA___AUC",
+                        "DetRe___AUC",
+                        "DetPr___AUC",
+                        "AssRe___AUC",
+                        "AssPr___AUC",
+                        "LocA___AUC",
+                        "OWTA___AUC",
+                        "HOTA(0)",
+                        "LocA(0)",
+                        "HOTALocA(0)",
+                        "MOTA",
+                        "MOTP",
+                        "MODA",
+                        "CLR_Re",
+                        "CLR_Pr",
+                        "MTR",
+                        "PTR",
+                        "MLR",
+                        "CLR_TP",
+                        "CLR_FN",
+                        "CLR_FP",
+                        "IDSW",
+                        "MT",
+                        "PT",
+                        "ML",
+                        "Frag",
+                        "sMOTA",
+                        "IDF1",
+                        "IDR",
+                        "IDP",
+                        "IDTP",
+                        "IDFN",
+                        "IDFP",
+                        "Dets",
+                        "GT_Dets",
+                        "IDs",
+                        "GT_IDs",
                     ]
-                ) + "\n0019,nan," + ",".join(["0"] * 38) + "\n",
+                )
+                + "\n0019,nan,"
+                + ",".join(["0"] * 38)
+                + "\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "non-finite value"):
