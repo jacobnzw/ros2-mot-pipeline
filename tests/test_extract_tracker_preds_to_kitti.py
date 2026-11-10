@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.extract_tracker_kpi import (
+from scripts.extract_tracker_preds_to_kitti import (
     TrackBox,
     frame_from_timestamp,
     kitti_tracking_row,
