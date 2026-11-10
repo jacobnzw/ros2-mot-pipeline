@@ -196,7 +196,7 @@ uv run scripts/mot_bench.py --kitti-seq data/kitti/left_color/training/image_02/
 
 Evaluate one sequence with TrackEval (the KITTI `Kitti2DBox` implementation supports only `car` and `pedestrian`):
 ```shell
-uv run scripts/mot_trackeval.py \
+uv run scripts/run_trackeval.py \
   --sequence 0019 \
   --gt-folder data/kitti/left_color/training \
   --tracker-folder data/kitti/trackers/bytetrack \
@@ -217,8 +217,8 @@ scripts/analyse.sh runs/<run-id>/recording.rrd --hw jetson-orin --precision fp16
 
 The KPI CSV contains one row per TrackEval summary metric, class, and sequence, including TrackEval's `COMBINED` row,
 with the supplied hardware, precision, and label metadata. Scores remain ratios in `[0, 1]`; count metrics remain
-counts. `scripts/trackeval_to_csv.py runs/<run-id> --hw jetson-orin --precision fp16 --label baseline` can export the
-KPI CSV with these labels without importing it.
+counts. `scripts/trackeval_to_vm.py runs/<run-id> --hw jetson-orin --precision fp16 --label baseline` can export the KPI
+CSV with these labels without importing it.
 
 Use `--split` for a non-training seqmap and `--classes` to select either or both supported classes.
 

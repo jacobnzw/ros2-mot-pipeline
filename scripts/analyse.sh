@@ -122,7 +122,7 @@ uv run --project "$repo_root" python "$repo_root/scripts/extract_pipeline_kpi.py
 trackeval_file=$(find "$recording_dir" -type f -name '*_detailed.csv' -print -quit)
 if [[ -n $trackeval_file ]]; then
   echo "==> Exporting TrackEval KPIs from $recording_dir"
-  uv run --project "$repo_root" python "$repo_root/scripts/trackeval_to_csv.py" \
+  uv run --project "$repo_root" python "$repo_root/scripts/trackeval_to_vm.py" \
     "$recording_dir" --output "$kpi_csv_path" --run-id "$run_id" \
     --hw "$hw" --quant "$quant" --label "$label"
 else

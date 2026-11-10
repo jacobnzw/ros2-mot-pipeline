@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.mot_trackeval import read_sequence_entry
+from scripts.run_trackeval import read_sequence_entry
 
 
 class MotTrackEvalTests(unittest.TestCase):
@@ -10,8 +10,7 @@ class MotTrackEvalTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             seqmap = Path(directory) / "evaluate_tracking.seqmap.training"
             seqmap.write_text(
-                "0018 /data/image_02/0018 000000 000837\n"
-                "0019 /data/image_02/0019 000000 001059\n",
+                "0018 /data/image_02/0018 000000 000837\n0019 /data/image_02/0019 000000 001059\n",
                 encoding="utf-8",
             )
             self.assertEqual(
@@ -30,8 +29,7 @@ class MotTrackEvalTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             seqmap = Path(directory) / "evaluate_tracking.seqmap.training"
             seqmap.write_text(
-                "0019 /data/image_02/0019 000000 001059\n"
-                "0019 /data/image_02/other 000000 001059\n",
+                "0019 /data/image_02/0019 000000 001059\n0019 /data/image_02/other 000000 001059\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "appears more than once"):
