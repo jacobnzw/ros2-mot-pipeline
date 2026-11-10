@@ -126,11 +126,11 @@ def run_trackeval(
             "CLASSES_TO_EVAL": classes,
         }
         eval_config = {
-            "USE_PARALLEL": False,
-            "PRINT_RESULTS": True,
-            "PRINT_CONFIG": True,
-            "OUTPUT_SUMMARY": True,
-            "OUTPUT_DETAILED": True,
+            "USE_PARALLEL": True,
+            "PRINT_RESULTS": False,
+            "PRINT_CONFIG": False,
+            "OUTPUT_SUMMARY": False,
+            "OUTPUT_DETAILED": False,
             "PLOT_CURVES": False,
             "LOG_ON_ERROR": None,
         }

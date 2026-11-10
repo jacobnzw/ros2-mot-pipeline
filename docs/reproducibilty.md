@@ -231,7 +231,17 @@ pipeline KPI CSV and ByteTrack prediction, evaluates the selected prediction seq
 run-specific `trackeval_gt` folder, then exports tracker KPIs. By default, at most two per-sequence tasks run
 concurrently; use `--max-workers` to change this limit. Outputs are written to
 `runs/<run-id>/eval/pipeline/kpi_<sequence>.csv`, `runs/<run-id>/eval/trackers/bytetrack/`, and
-`runs/<run-id>/eval/tracker_kpi.csv`. The VictoriaMetrics/Grafana ingestion script remains a separate step.
+`runs/<run-id>/eval/tracker_kpi.csv`.
+
+To start the VictoriaMetrics/Grafana Compose stack and ingest every pipeline KPI CSV plus the tracker KPI CSV for that
+run:
+
+```shell
+scripts/vm_grafana_ingest.sh <run-id>
+```
+
+The script waits for both services to be ready before importing the CSVs. The stack and persistent Docker volumes remain
+running after ingestion.
 
 Run `scripts/analyse.sh` with the recording path and metadata labels to export the RRD latency samples and, when
 TrackEval detailed results are present, write `trackeval.csv` beside `latency.csv` and import both CSVs into
