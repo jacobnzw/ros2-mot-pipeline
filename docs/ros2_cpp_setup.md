@@ -140,7 +140,7 @@ ros2 launch launch/detector_test.launch.py seq:=0020 \
 To run every sequence directory in an MCAP root sequentially, use the batch runner:
 
 ```bash
-uv run scripts/run_kitti_sequences.py \
+uv run scripts/eval/run_kitti_sequences.py \
   --thread-num 1 --precision fp16 --label baseline
 ```
 
@@ -186,7 +186,7 @@ file modification time; score values are ratios in `[0, 1]`, while count metrics
 to the recording directory name; pass an optional second argument to `analyse.sh` to override it. The stage label comes
 from the Rerun entity path (for example, `/detector/inference_latency_ms` becomes `detector_inference`). Counters and
 other non-duration scalars are omitted. You can also run
-`uv run scripts/extract_pipeline_kpi.py runs/<run-id>/recording.rrd --hw jetson-orin --precision fp16 --seq 0020 --label baseline`
+`uv run scripts/eval/extract_pipeline_kpi.py runs/<run-id>/recording.rrd --hw jetson-orin --precision fp16 --seq 0020 --label baseline`
 to export only the CSV with those labels.
 
 The exporter uses `steady_elapsed` when present, falling back to `ros2_timestamp` for older recordings. It maps elapsed

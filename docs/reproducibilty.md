@@ -196,7 +196,7 @@ uv run scripts/mot_bench.py --kitti-seq data/kitti/left_color/training/image_02/
 
 TrackEval evaluates every sequence with a `.txt` prediction file in the tracker's `data/` folder by default. To evaluate only selected sequences, pass their IDs as a space- or comma-separated list. The KITTI `Kitti2DBox` implementation supports only `car` and `pedestrian`.
 ```shell
-uv run scripts/run_trackeval.py \
+uv run scripts/eval/run_trackeval.py \
   --gt-folder data/kitti/left_color/training \
   --tracker-folder data/kitti/trackers/bytetrack \
   --output-folder runs/<run-id>
@@ -204,7 +204,7 @@ uv run scripts/run_trackeval.py \
 
 For an explicit sequence selection:
 ```shell
-uv run scripts/run_trackeval.py \
+uv run scripts/eval/run_trackeval.py \
   --sequence 0018 0019 \
   --gt-folder data/kitti/left_color/training \
   --tracker-folder data/kitti/trackers/bytetrack \
@@ -214,6 +214,34 @@ The tracker folder must contain `data/<sequence>.txt`. The CLI selects the reque
 `evaluate_tracking.seqmap.<split>` in the GT folder without modifying that folder. Results are written under the output
 folder, including per-class summary and detailed result files under `bytetrack/`. Using the run folder as the output
 folder keeps the TrackEval results beside `recording.rrd`.
+
+### Hamilton evaluation pipeline
+
+After `scripts/eval/run_kitti_sequences.py` has created the recordings and `metadata.yaml`, run the Hamilton DAG for the
+whole run:
+
+```shell
+uv run scripts/eval/evaluate_pipeline.py runs/<run-id>/metadata.yaml
+```
+
+`run_kitti_sequences.py` creates `runs/<run-id>/eval/label_02` as a symlink to the configured KITTI labels and generates
+`runs/<run-id>/eval/evaluate_tracking.seqmap.training`. It counts image messages in each selected MCAP for the seqmap's
+frame count and records both paths in `metadata.yaml`. The pipeline runs one parallel task per recording to extract its
+pipeline KPI CSV and ByteTrack prediction, evaluates the selected prediction sequences once with TrackEval using the
+run-specific `trackeval_gt` folder, then exports tracker KPIs. By default, at most two per-sequence tasks run
+concurrently; use `--max-workers` to change this limit. Outputs are written to
+`runs/<run-id>/eval/pipeline/kpi_<sequence>.csv`, `runs/<run-id>/eval/trackers/bytetrack/`, and
+`runs/<run-id>/eval/tracker_kpi.csv`.
+
+To start the VictoriaMetrics/Grafana Compose stack and ingest every pipeline KPI CSV plus the tracker KPI CSV for that
+run:
+
+```shell
+scripts/eval/vm_grafana_ingest.sh <run-id>
+```
+
+The script waits for both services to be ready before importing the CSVs. The stack and persistent Docker volumes remain
+running after ingestion.
 
 Run `scripts/analyse.sh` with the recording path and metadata labels to export the RRD latency samples and, when
 TrackEval detailed results are present, write `trackeval.csv` beside `latency.csv` and import both CSVs into
@@ -225,7 +253,7 @@ scripts/analyse.sh runs/<run-id>/recording.rrd --hw jetson-orin --precision fp16
 
 The KPI CSV contains one row per TrackEval summary metric, class, and sequence, including TrackEval's `COMBINED` row,
 with the supplied hardware, precision, and label metadata. Scores remain ratios in `[0, 1]`; count metrics remain
-counts. `scripts/trackeval_to_vm.py runs/<run-id> --hw jetson-orin --precision fp16 --label baseline` can export the KPI
+counts. `scripts/eval/trackeval_to_vm.py runs/<run-id> --hw jetson-orin --precision fp16 --label baseline` can export the KPI
 CSV with these labels without importing it.
 
 Use `--split` for a non-training seqmap and `--classes` to select either or both supported classes.
