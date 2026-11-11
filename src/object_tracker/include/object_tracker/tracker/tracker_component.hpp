@@ -19,6 +19,7 @@ public:
 
 private:
   struct Latencies {
+    rclcpp::Time callback_start;
     int64_t detections_stamp_ns;
     double callback_interval_ms = 0.0;
     int64_t frame_drop_count = 0;

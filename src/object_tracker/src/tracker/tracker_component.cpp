@@ -87,6 +87,8 @@ void TrackerComponent::detectionsCallback(const msg::TimedDetection2DArray::Uniq
   const auto pipeline_latency = steady_clock_->now() - detector_start;
   metrics::log_scalar("pipeline/end_to_end_latency_ms", pipeline_latency.seconds() * 1000.0,
                       latencies.detections_stamp_ns);
+  const auto callback_duration_ms = (steady_clock_->now() - latencies.callback_start).seconds() * 1000.0;
+  metrics::log_scalar("tracker/callback_duration_ms", callback_duration_ms, latencies.detections_stamp_ns);
 }
 
 TrackerComponent::Latencies TrackerComponent::measure_latencies(const rclcpp::Time &detections_stamp) {
@@ -116,7 +118,7 @@ TrackerComponent::Latencies TrackerComponent::measure_latencies(const rclcpp::Ti
     frame_drop_count = frame_drop_count_;
   }
 
-  return {detections_stamp_ns, callback_interval_ms, frame_drop_count, had_previous_detections};
+  return {callback_start, detections_stamp_ns, callback_interval_ms, frame_drop_count, had_previous_detections};
 }
 
 std::vector<Detection> TrackerComponent::convert(const vision_msgs::msg::Detection2DArray &detections_msg) const {
