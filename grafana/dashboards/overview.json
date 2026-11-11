@@ -16,7 +16,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "abs(latency_ms{stage=\"detector_inference\",label=~\"$label\"} - avg_over_time(latency_ms{stage=\"detector_inference\",label=~\"$label\"}[5s]))",
+          "expr": "abs(pipeline_kpi{stage=\"detector_inference\",label=~\"$label\"} - avg_over_time(pipeline_kpi{stage=\"detector_inference\",label=~\"$label\"}[5s]))",
           "interval": "100ms",
           "legendFormat": "detector",
           "range": true,
@@ -38,7 +38,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "abs(latency_ms{stage=\"tracker_association\",label=~\"$label\"} - avg_over_time(latency_ms{stage=\"tracker_association\",label=~\"$label\"}[5s]))",
+          "expr": "abs(pipeline_kpi{stage=\"tracker_association\",label=~\"$label\"} - avg_over_time(pipeline_kpi{stage=\"tracker_association\",label=~\"$label\"}[5s]))",
           "interval": "100ms",
           "legendFormat": "association",
           "range": true,
@@ -68,7 +68,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "avg by (metric, class) (last_over_time(trackeval_kpi{label=~\"$label\",sequence=\"COMBINED\",metric=~\"HOTA|IDF1|MOTP\"}[31d]))",
+          "expr": "avg by (metric, class) (last_over_time(mot_kpi{label=~\"$label\",sequence=\"COMBINED\",metric=~\"HOTA|IDF1|MOTP\"}[31d]))",
           "format": "table",
           "instant": true,
           "legendFormat": "{{class}}",
@@ -104,7 +104,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "avg by (metric, class) (last_over_time(trackeval_kpi{label=~\"$label\",sequence=\"COMBINED\",metric=~\"IDSW|Frag\"}[31d]))",
+          "expr": "avg by (metric, class) (last_over_time(mot_kpi{label=~\"$label\",sequence=\"COMBINED\",metric=~\"IDSW|Frag\"}[31d]))",
           "format": "table",
           "instant": true,
           "legendFormat": "{{class}}",
@@ -129,12 +129,12 @@
       {
         "current": {"selected": true, "text": "", "value": ""},
         "datasource": {"type": "prometheus", "uid": "victoriametrics"},
-        "definition": "label_values({__name__=~\"latency_ms|trackeval_kpi\",label!=\"\"}, label)",
+        "definition": "label_values({__name__=~\"pipeline_kpi|mot_kpi\",label!=\"\"}, label)",
         "includeAll": false,
         "label": "Label",
         "name": "label",
         "options": [],
-        "query": "label_values({__name__=~\"latency_ms|trackeval_kpi\",label!=\"\"}, label)",
+        "query": "label_values({__name__=~\"pipeline_kpi|mot_kpi\",label!=\"\"}, label)",
         "refresh": 2,
         "type": "query"
       }

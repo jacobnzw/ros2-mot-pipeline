@@ -180,9 +180,9 @@ scripts/analyse.sh runs/<run-id>/recording.rrd \
 The script writes `latency.csv` beside the recording and, if TrackEval detailed results are present under the same run
 folder, writes `trackeval.csv` there too. It starts the Compose services, waits for them to respond, and imports both
 CSVs into VictoriaMetrics. Latency rows have columns `timestamp_ms,run,stage,hardware,precision,sequence,label,value`
-and become `latency_ms` samples. The `--hw`, `--precision`, `--seq`, and `--label` options populate the corresponding
+and become `pipeline_kpi` samples. The `--hw`, `--precision`, `--seq`, and `--label` options populate the corresponding
 metadata labels; they default to empty strings. TrackEval rows have columns
-`timestamp_ms,run,hardware,precision,label,tracker,sequence,class,metric,value` and become `trackeval_kpi` samples with
+`timestamp_ms,run,hardware,precision,label,tracker,sequence,class,metric,value` and become `mot_kpi` samples with
 run/hardware/precision/label/tracker/sequence/class/metric labels. TrackEval timestamps use the newest detailed-results
 file modification time; score values are ratios in `[0, 1]`, while count metrics remain counts. The run label defaults
 to the recording directory name; pass an optional second argument to `analyse.sh` to override it. The stage label comes

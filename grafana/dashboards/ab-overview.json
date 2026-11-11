@@ -16,7 +16,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "abs(latency_ms{stage=\"detector_inference\",label=~\"$label_a\"} - avg_over_time(latency_ms{stage=\"detector_inference\",label=~\"$label_a\"}[5s]))",
+          "expr": "abs(pipeline_kpi{stage=\"detector_inference\",label=~\"$label_a\"} - avg_over_time(pipeline_kpi{stage=\"detector_inference\",label=~\"$label_a\"}[5s]))",
           "interval": "100ms",
           "legendFormat": "$label_a",
           "range": true,
@@ -25,7 +25,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "abs(latency_ms{stage=\"detector_inference\",label=~\"$label_b\"} - avg_over_time(latency_ms{stage=\"detector_inference\",label=~\"$label_b\"}[5s]))",
+          "expr": "abs(pipeline_kpi{stage=\"detector_inference\",label=~\"$label_b\"} - avg_over_time(pipeline_kpi{stage=\"detector_inference\",label=~\"$label_b\"}[5s]))",
           "interval": "100ms",
           "legendFormat": "$label_b",
           "range": true,
@@ -47,7 +47,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "abs(latency_ms{stage=\"tracker_association\",label=~\"$label_a\"} - avg_over_time(latency_ms{stage=\"tracker_association\",label=~\"$label_a\"}[5s]))",
+          "expr": "abs(pipeline_kpi{stage=\"tracker_association\",label=~\"$label_a\"} - avg_over_time(pipeline_kpi{stage=\"tracker_association\",label=~\"$label_a\"}[5s]))",
           "interval": "100ms",
           "legendFormat": "$label_a",
           "range": true,
@@ -56,7 +56,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "abs(latency_ms{stage=\"tracker_association\",label=~\"$label_b\"} - avg_over_time(latency_ms{stage=\"tracker_association\",label=~\"$label_b\"}[5s]))",
+          "expr": "abs(pipeline_kpi{stage=\"tracker_association\",label=~\"$label_b\"} - avg_over_time(pipeline_kpi{stage=\"tracker_association\",label=~\"$label_b\"}[5s]))",
           "interval": "100ms",
           "legendFormat": "$label_b",
           "range": true,
@@ -86,7 +86,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "label_join(label_replace(avg by (label, metric, class) (last_over_time(trackeval_kpi{label=~\"$label_a\",sequence=\"COMBINED\",metric=~\"HOTA|IDF1|MOTP\"}[31d])), \"label\", \"A\", \"label\", \".*\"), \"series\", \" - \", \"label\", \"class\")",
+          "expr": "label_join(label_replace(avg by (label, metric, class) (last_over_time(mot_kpi{label=~\"$label_a\",sequence=\"COMBINED\",metric=~\"HOTA|IDF1|MOTP\"}[31d])), \"label\", \"A\", \"label\", \".*\"), \"series\", \" - \", \"label\", \"class\")",
           "format": "table",
           "instant": true,
           "legendFormat": "A - {{class}}",
@@ -96,7 +96,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "label_join(label_replace(avg by (label, metric, class) (last_over_time(trackeval_kpi{label=~\"$label_b\",sequence=\"COMBINED\",metric=~\"HOTA|IDF1|MOTP\"}[31d])), \"label\", \"B\", \"label\", \".*\"), \"series\", \" - \", \"label\", \"class\")",
+          "expr": "label_join(label_replace(avg by (label, metric, class) (last_over_time(mot_kpi{label=~\"$label_b\",sequence=\"COMBINED\",metric=~\"HOTA|IDF1|MOTP\"}[31d])), \"label\", \"B\", \"label\", \".*\"), \"series\", \" - \", \"label\", \"class\")",
           "format": "table",
           "instant": true,
           "legendFormat": "B - {{class}}",
@@ -132,7 +132,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "label_join(label_replace(avg by (label, metric, class) (last_over_time(trackeval_kpi{label=~\"$label_a\",sequence=\"COMBINED\",metric=~\"IDSW|Frag\"}[31d])), \"label\", \"A\", \"label\", \".*\"), \"series\", \" - \", \"label\", \"class\")",
+          "expr": "label_join(label_replace(avg by (label, metric, class) (last_over_time(mot_kpi{label=~\"$label_a\",sequence=\"COMBINED\",metric=~\"IDSW|Frag\"}[31d])), \"label\", \"A\", \"label\", \".*\"), \"series\", \" - \", \"label\", \"class\")",
           "format": "table",
           "instant": true,
           "legendFormat": "A - {{class}}",
@@ -142,7 +142,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "label_join(label_replace(avg by (label, metric, class) (last_over_time(trackeval_kpi{label=~\"$label_b\",sequence=\"COMBINED\",metric=~\"IDSW|Frag\"}[31d])), \"label\", \"B\", \"label\", \".*\"), \"series\", \" - \", \"label\", \"class\")",
+          "expr": "label_join(label_replace(avg by (label, metric, class) (last_over_time(mot_kpi{label=~\"$label_b\",sequence=\"COMBINED\",metric=~\"IDSW|Frag\"}[31d])), \"label\", \"B\", \"label\", \".*\"), \"series\", \" - \", \"label\", \"class\")",
           "format": "table",
           "instant": true,
           "legendFormat": "B - {{class}}",
@@ -167,24 +167,24 @@
       {
         "current": {"selected": true, "text": "", "value": ""},
         "datasource": {"type": "prometheus", "uid": "victoriametrics"},
-        "definition": "label_values({__name__=~\"latency_ms|trackeval_kpi\",label!=\"\"}, label)",
+        "definition": "label_values({__name__=~\"pipeline_kpi|mot_kpi\",label!=\"\"}, label)",
         "includeAll": false,
         "label": "Label A",
         "name": "label_a",
         "options": [],
-        "query": "label_values({__name__=~\"latency_ms|trackeval_kpi\",label!=\"\"}, label)",
+        "query": "label_values({__name__=~\"pipeline_kpi|mot_kpi\",label!=\"\"}, label)",
         "refresh": 2,
         "type": "query"
       },
       {
         "current": {"selected": true, "text": "", "value": ""},
         "datasource": {"type": "prometheus", "uid": "victoriametrics"},
-        "definition": "label_values({__name__=~\"latency_ms|trackeval_kpi\",label!=\"\"}, label)",
+        "definition": "label_values({__name__=~\"pipeline_kpi|mot_kpi\",label!=\"\"}, label)",
         "includeAll": false,
         "label": "Label B",
         "name": "label_b",
         "options": [],
-        "query": "label_values({__name__=~\"latency_ms|trackeval_kpi\",label!=\"\"}, label)",
+        "query": "label_values({__name__=~\"pipeline_kpi|mot_kpi\",label!=\"\"}, label)",
         "refresh": 2,
         "type": "query"
       }
