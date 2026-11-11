@@ -104,7 +104,6 @@ def read_trackeval_samples(results_folder: Path) -> tuple[list[KpiSample], list[
 def write_kpi_csv(
     samples: list[KpiSample],
     output_path: Path,
-    run_id: str,
     timestamp_ms: int,
     hardware: str = "",
     precision: str = "",
@@ -112,8 +111,6 @@ def write_kpi_csv(
 ) -> None:
     if not samples:
         raise ValueError("TrackEval results contain no KPI samples")
-    if not run_id:
-        raise ValueError("run label must not be empty")
 
     with output_path.open("w", newline="", encoding="utf-8") as csv_file:
         writer = csv.writer(csv_file, lineterminator="\n")
@@ -121,7 +118,6 @@ def write_kpi_csv(
             writer.writerow(
                 (
                     timestamp_ms,
-                    run_id,
                     hardware,
                     precision,
                     label,
@@ -181,7 +177,6 @@ def main() -> None:
         write_kpi_csv(
             samples,
             output_path,
-            run_id,
             timestamp_ms,
             hardware=args.hw,
             precision=args.precision,

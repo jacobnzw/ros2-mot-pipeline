@@ -177,7 +177,6 @@ def tracker_kpi_csv(trackeval_results_folder: Path, run_metadata: RunMetadata) -
     trackeval_to_vm.write_kpi_csv(
         samples,
         output_path,
-        run_id=run_metadata.label,  # TODO: used twice: label == run_id; drop run_id?
         timestamp_ms=timestamp_ms,
         hardware=run_metadata.hardware,
         precision=run_metadata.precision,
