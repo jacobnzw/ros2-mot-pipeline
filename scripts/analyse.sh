@@ -175,12 +175,15 @@ if [[ -n $trackeval_file && -f $kpi_csv_path ]]; then
   echo
 fi
 
-# URL-encode the run label before placing it in a query parameter, so special
-# characters in a custom label cannot break the Grafana link.
-encoded_run_id=$(python3 -c 'import sys; from urllib.parse import quote; print(quote(sys.argv[1], safe=""))' "$run_id")
+# URL-encode the custom label before placing it in a query parameter.
+encoded_label=$(python3 -c 'import sys; from urllib.parse import quote; print(quote(sys.argv[1], safe=""))' "$label")
 echo "Done."
 echo "Run: $run_id"
-echo "Grafana dashboard: http://127.0.0.1:3000/d/ros2-latency/ros-2-latency-analysis?var-run=$encoded_run_id"
+dashboard_url="http://127.0.0.1:3000/d/ros2-latency/pipeline-details"
+if [[ -n $label ]]; then
+  dashboard_url+="?var-label=$encoded_label"
+fi
+echo "Grafana dashboard: $dashboard_url"
 echo "VictoriaMetrics UI: http://127.0.0.1:8428/vmui"
 echo "CSV kept at: $csv_path"
 if [[ -n $trackeval_file && -f $kpi_csv_path ]]; then

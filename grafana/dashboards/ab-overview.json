@@ -1,0 +1,199 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Detector latency jitter is the absolute deviation from the trailing 5-second mean. Label A and label B distributions are overlaid; sequences within each label are combined.",
+      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
+      "gridPos": {"h": 12, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "maxDataPoints": 20000,
+      "options": {"bucketCount": 30, "combine": false, "fillOpacity": 35, "gradientMode": "opacity", "legend": {"show": true}, "showValue": "never", "tooltip": {"show": true}, "xAxis": {"max": null, "min": 0}, "yAxis": {"axisPlacement": "left", "max": null, "min": 0, "unit": "count"}},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "abs(latency_ms{stage=\"detector_inference\",label=~\"$label_a\"} - avg_over_time(latency_ms{stage=\"detector_inference\",label=~\"$label_a\"}[5s]))",
+          "interval": "100ms",
+          "legendFormat": "$label_a",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "abs(latency_ms{stage=\"detector_inference\",label=~\"$label_b\"} - avg_over_time(latency_ms{stage=\"detector_inference\",label=~\"$label_b\"}[5s]))",
+          "interval": "100ms",
+          "legendFormat": "$label_b",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Detector latency jitter - A/B",
+      "type": "histogram"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Association latency jitter is the absolute deviation from the trailing 5-second mean. Label A and label B distributions are overlaid; sequences within each label are combined.",
+      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
+      "gridPos": {"h": 12, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "maxDataPoints": 20000,
+      "options": {"bucketCount": 30, "combine": false, "fillOpacity": 35, "gradientMode": "opacity", "legend": {"show": true}, "showValue": "never", "tooltip": {"show": true}, "xAxis": {"max": null, "min": 0}, "yAxis": {"axisPlacement": "left", "max": null, "min": 0, "unit": "count"}},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "abs(latency_ms{stage=\"tracker_association\",label=~\"$label_a\"} - avg_over_time(latency_ms{stage=\"tracker_association\",label=~\"$label_a\"}[5s]))",
+          "interval": "100ms",
+          "legendFormat": "$label_a",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "abs(latency_ms{stage=\"tracker_association\",label=~\"$label_b\"} - avg_over_time(latency_ms{stage=\"tracker_association\",label=~\"$label_b\"}[5s]))",
+          "interval": "100ms",
+          "legendFormat": "$label_b",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Association latency jitter - A/B",
+      "type": "histogram"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "TrackEval COMBINED values shown side by side for label A and label B, grouped by metric and KITTI class.",
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 12, "w": 12, "x": 0, "y": 12},
+      "id": 3,
+      "options": {
+        "barWidth": 0.8,
+        "groupWidth": 0.7,
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "orientation": "vertical",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {"mode": "single", "sort": "none"},
+        "xField": "metric\\series"
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "label_join(label_replace(avg by (label, metric, class) (last_over_time(trackeval_kpi{label=~\"$label_a\",sequence=\"COMBINED\",metric=~\"HOTA|IDF1|MOTP\"}[31d])), \"label\", \"A\", \"label\", \".*\"), \"series\", \" - \", \"label\", \"class\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "A - {{class}}",
+          "range": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "label_join(label_replace(avg by (label, metric, class) (last_over_time(trackeval_kpi{label=~\"$label_b\",sequence=\"COMBINED\",metric=~\"HOTA|IDF1|MOTP\"}[31d])), \"label\", \"B\", \"label\", \".*\"), \"series\", \" - \", \"label\", \"class\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "B - {{class}}",
+          "range": false,
+          "refId": "B"
+        }
+      ],
+      "title": "Tracker KPIs - HOTA, IDF1, MOTP (COMBINED)",
+      "transformations": [
+        {"id": "labelsToFields", "options": {"mode": "columns"}},
+        {"id": "merge", "options": {}},
+        {"id": "groupingToMatrix", "options": {"columnField": "series", "rowField": "metric", "valueField": "Value"}}
+      ],
+      "type": "barchart"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "TrackEval COMBINED values shown side by side for label A and label B, grouped by metric and KITTI class.",
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 12, "w": 12, "x": 12, "y": 12},
+      "id": 4,
+      "options": {
+        "barWidth": 0.8,
+        "groupWidth": 0.7,
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "orientation": "vertical",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {"mode": "single", "sort": "none"},
+        "xField": "metric\\series"
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "label_join(label_replace(avg by (label, metric, class) (last_over_time(trackeval_kpi{label=~\"$label_a\",sequence=\"COMBINED\",metric=~\"IDSW|Frag\"}[31d])), \"label\", \"A\", \"label\", \".*\"), \"series\", \" - \", \"label\", \"class\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "A - {{class}}",
+          "range": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "label_join(label_replace(avg by (label, metric, class) (last_over_time(trackeval_kpi{label=~\"$label_b\",sequence=\"COMBINED\",metric=~\"IDSW|Frag\"}[31d])), \"label\", \"B\", \"label\", \".*\"), \"series\", \" - \", \"label\", \"class\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "B - {{class}}",
+          "range": false,
+          "refId": "B"
+        }
+      ],
+      "title": "Tracker KPIs - IDSW, Frag (COMBINED)",
+      "transformations": [
+        {"id": "labelsToFields", "options": {"mode": "columns"}},
+        {"id": "merge", "options": {}},
+        {"id": "groupingToMatrix", "options": {"columnField": "series", "rowField": "metric", "valueField": "Value"}}
+      ],
+      "type": "barchart"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 41,
+  "tags": ["ros2", "overview", "comparison"],
+  "templating": {
+    "list": [
+      {
+        "current": {"selected": true, "text": "", "value": ""},
+        "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+        "definition": "label_values({__name__=~\"latency_ms|trackeval_kpi\",label!=\"\"}, label)",
+        "includeAll": false,
+        "label": "Label A",
+        "name": "label_a",
+        "options": [],
+        "query": "label_values({__name__=~\"latency_ms|trackeval_kpi\",label!=\"\"}, label)",
+        "refresh": 2,
+        "type": "query"
+      },
+      {
+        "current": {"selected": true, "text": "", "value": ""},
+        "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+        "definition": "label_values({__name__=~\"latency_ms|trackeval_kpi\",label!=\"\"}, label)",
+        "includeAll": false,
+        "label": "Label B",
+        "name": "label_b",
+        "options": [],
+        "query": "label_values({__name__=~\"latency_ms|trackeval_kpi\",label!=\"\"}, label)",
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {"from": "now-30m", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "A/B Overview",
+  "uid": "ros2-ab-overview",
+  "version": 1
+}
