@@ -11,9 +11,9 @@ from hamilton import driver, htypes
 from hamilton.execution import executors
 
 if __package__ in {None, ""}:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from scripts import extract_pipeline_kpi, extract_tracker_preds_to_kitti, run_trackeval, trackeval_to_vm
+from scripts.eval import extract_pipeline_kpi, extract_tracker_preds_to_kitti, run_trackeval, trackeval_to_vm
 
 
 @dataclass(frozen=True)

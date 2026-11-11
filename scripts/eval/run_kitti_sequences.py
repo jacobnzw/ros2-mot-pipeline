@@ -212,7 +212,7 @@ def main() -> int:
     except (OSError, ValueError) as error:
         parser.error(str(error))
 
-    repository_root = Path(__file__).resolve().parents[1]
+    repository_root = Path(__file__).resolve().parents[2]
     try:
         run_dir = repository_root / "runs" / args.label
         eval_folder = run_dir / "eval"

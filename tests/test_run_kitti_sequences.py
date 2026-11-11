@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 
 import yaml
 
-from scripts.run_kitti_sequences import (
+from scripts.eval.run_kitti_sequences import (
     count_mcap_frames,
     create_trackeval_gt,
     discover_sequences,
@@ -149,7 +149,7 @@ class RunKittiSequencesTests(unittest.TestCase):
         ]
         reader.messages.return_value = iter((object(), object(), object()))
 
-        with patch("scripts.run_kitti_sequences.Reader", return_value=reader):
+        with patch("scripts.eval.run_kitti_sequences.Reader", return_value=reader):
             self.assertEqual(count_mcap_frames(Path("/dataset/0001.mcap")), 3)
 
         reader.messages.assert_called_once_with(connections=[reader.connections[0]])
@@ -168,7 +168,7 @@ class RunKittiSequencesTests(unittest.TestCase):
 
             eval_folder = root / "runs" / "nightly" / "eval"
             with patch(
-                "scripts.run_kitti_sequences.count_mcap_frames",
+                "scripts.eval.run_kitti_sequences.count_mcap_frames",
                 side_effect=[447, 1059],
             ):
                 seqmap_path = create_trackeval_gt(eval_folder, label_dir, sequences)

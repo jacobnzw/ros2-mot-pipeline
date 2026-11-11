@@ -6,9 +6,9 @@ from unittest.mock import patch
 
 import yaml
 
-from scripts import evaluate_pipeline
-from scripts.extract_pipeline_kpi import Sample
-from scripts.trackeval_to_vm import KpiSample
+from scripts.eval import evaluate_pipeline
+from scripts.eval.extract_pipeline_kpi import Sample
+from scripts.eval.trackeval_to_vm import KpiSample
 
 
 class EvaluatePipelineTests(unittest.TestCase):

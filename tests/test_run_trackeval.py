@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from scripts.run_trackeval import (
+from scripts.eval.run_trackeval import (
     discover_tracker_sequences,
     parse_sequences,
     read_sequence_entries,
@@ -112,11 +112,11 @@ class MotTrackEvalTests(unittest.TestCase):
             )
             evaluator = Mock()
             with (
-                patch("scripts.run_trackeval.trackeval.datasets.Kitti2DBox", dataset_factory),
-                patch("scripts.run_trackeval.trackeval.Evaluator", return_value=evaluator),
-                patch("scripts.run_trackeval.trackeval.metrics.HOTA", return_value="hota"),
-                patch("scripts.run_trackeval.trackeval.metrics.CLEAR", return_value="clear"),
-                patch("scripts.run_trackeval.trackeval.metrics.Identity", return_value="identity"),
+                patch("scripts.eval.run_trackeval.trackeval.datasets.Kitti2DBox", dataset_factory),
+                patch("scripts.eval.run_trackeval.trackeval.Evaluator", return_value=evaluator),
+                patch("scripts.eval.run_trackeval.trackeval.metrics.HOTA", return_value="hota"),
+                patch("scripts.eval.run_trackeval.trackeval.metrics.CLEAR", return_value="clear"),
+                patch("scripts.eval.run_trackeval.trackeval.metrics.Identity", return_value="identity"),
             ):
                 run_trackeval(
                     sequences=None,

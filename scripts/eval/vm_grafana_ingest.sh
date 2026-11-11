@@ -28,7 +28,7 @@ if ! docker compose version >/dev/null 2>&1; then
 fi
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-repo_root=$(cd -- "$script_dir/.." && pwd)
+repo_root=$(cd -- "$script_dir/../.." && pwd)
 run_dir="$repo_root/runs/$label"
 pipeline_dir="$run_dir/eval/pipeline"
 tracker_kpi_csv="$run_dir/eval/tracker_kpi.csv"

@@ -17,7 +17,7 @@ fi
 # Check required programs before doing any work. command -v returns non-zero if
 # a program is unavailable; >/dev/null hides its normal output.
 if ! command -v uv >/dev/null 2>&1; then
-  echo "Error: uv is required to run scripts/extract_pipeline_kpi.py" >&2
+  echo "Error: uv is required to run scripts/eval/extract_pipeline_kpi.py" >&2
   exit 1
 fi
 if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
@@ -113,7 +113,7 @@ kpi_csv_path="$recording_dir/trackeval.csv"
 # Python dependencies; each argument is quoted to keep paths with spaces intact.
 cd -- "$repo_root"
 echo "==> Exporting latency samples from $recording_path (run: $run_id)"
-uv run --project "$repo_root" python "$repo_root/scripts/extract_pipeline_kpi.py" \
+uv run --project "$repo_root" python "$repo_root/scripts/eval/extract_pipeline_kpi.py" \
   "$recording_path" --output "$csv_path" --run-id "$run_id" \
   --hw "$hw" --quant "$quant" --seq "$seq" --label "$label"
 
@@ -122,7 +122,7 @@ uv run --project "$repo_root" python "$repo_root/scripts/extract_pipeline_kpi.py
 trackeval_file=$(find "$recording_dir" -type f -name '*_detailed.csv' -print -quit)
 if [[ -n $trackeval_file ]]; then
   echo "==> Exporting TrackEval KPIs from $recording_dir"
-  uv run --project "$repo_root" python "$repo_root/scripts/trackeval_to_vm.py" \
+  uv run --project "$repo_root" python "$repo_root/scripts/eval/trackeval_to_vm.py" \
     "$recording_dir" --output "$kpi_csv_path" --run-id "$run_id" \
     --hw "$hw" --quant "$quant" --label "$label"
 else

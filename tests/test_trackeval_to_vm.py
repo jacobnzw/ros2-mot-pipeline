@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.trackeval_to_vm import (
+from scripts.eval.trackeval_to_vm import (
     KpiSample,
     read_trackeval_samples,
     write_kpi_csv,
