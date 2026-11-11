@@ -1,20 +1,434 @@
 {
-  "annotations": {"list": []},
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
   "editable": true,
+  "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": null,
+  "id": 4,
+  "links": [],
   "panels": [
     {
-      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
-      "description": "Absolute deviation of detector latency samples from their trailing 5-second mean; sequences for the selected label are combined.",
-      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
-      "gridPos": {"h": 12, "w": 12, "x": 0, "y": 0},
-      "id": 1,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 8,
+      "panels": [],
+      "title": "Latencies",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "description": "Mean, p50, and p95 detector inference latency calculated from samples across all sequences matching the selected label and dashboard time range.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "ms"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value (mean)"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Mean"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value (p50)"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "p50"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value (p95)"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "p95"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "id": 9,
       "maxDataPoints": 20000,
-      "options": {"bucketCount": 30, "combine": true, "fillOpacity": 55, "gradientMode": "opacity", "legend": {"show": true}, "showValue": "never", "tooltip": {"show": true}, "xAxis": {"max": null, "min": 0}, "yAxis": {"axisPlacement": "left", "max": null, "min": 0, "unit": "count"}},
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
       "targets": [
         {
-          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "editorMode": "code",
+          "expr": "pipeline_kpi{stage=\"detector_inference\",label=~\"$label\"}",
+          "interval": "100ms",
+          "legendFormat": "detector_inference",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "seriesToRows",
+          "options": {}
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "Metric": {
+                "aggregations": [
+                  "count"
+                ],
+                "operation": "groupby"
+              },
+              "Value": {
+                "aggregations": [
+                  "mean",
+                  "p50",
+                  "p95"
+                ],
+                "operation": "aggregate"
+              }
+            }
+          }
+        }
+      ],
+      "title": "Detector inference latency",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "description": "Distribution of detector inference latency samples for the selected label, combined across sequences.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 12,
+        "x": 0,
+        "y": 7
+      },
+      "id": 5,
+      "maxDataPoints": 20000,
+      "options": {
+        "bucketCount": 30,
+        "combine": true,
+        "fillOpacity": 55,
+        "gradientMode": "opacity",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "show": true,
+          "showLegend": true
+        },
+        "showValue": "never",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "show": true,
+          "sort": "none"
+        },
+        "xAxis": {
+          "min": 0
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "min": 0,
+          "unit": "count"
+        }
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "editorMode": "code",
+          "expr": "pipeline_kpi{stage=\"detector_inference\",label=~\"$label\"}",
+          "interval": "100ms",
+          "legendFormat": "detector",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Detector inference latency",
+      "type": "histogram"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "description": "Distribution of tracker association latency samples for the selected label, combined across sequences.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 12,
+        "x": 12,
+        "y": 7
+      },
+      "id": 6,
+      "maxDataPoints": 20000,
+      "options": {
+        "bucketCount": 30,
+        "combine": true,
+        "fillOpacity": 55,
+        "gradientMode": "opacity",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "show": true,
+          "showLegend": true
+        },
+        "showValue": "never",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "show": true,
+          "sort": "none"
+        },
+        "xAxis": {
+          "min": 0
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "min": 0,
+          "unit": "count"
+        }
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "editorMode": "code",
+          "expr": "pipeline_kpi{stage=\"tracker_association\",label=~\"$label\"}",
+          "interval": "100ms",
+          "legendFormat": "association",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Tracker association latency",
+      "type": "histogram"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "description": "Absolute deviation of detector latency samples from their trailing 5-second mean; sequences for the selected label are combined.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 12,
+        "x": 0,
+        "y": 19
+      },
+      "id": 1,
+      "maxDataPoints": 20000,
+      "options": {
+        "bucketCount": 30,
+        "combine": true,
+        "fillOpacity": 55,
+        "gradientMode": "opacity",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "show": true,
+          "showLegend": true
+        },
+        "showValue": "never",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "show": true,
+          "sort": "none"
+        },
+        "xAxis": {
+          "min": 0
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "min": 0,
+          "unit": "count"
+        }
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
           "editorMode": "code",
           "expr": "abs(pipeline_kpi{stage=\"detector_inference\",label=~\"$label\"} - avg_over_time(pipeline_kpi{stage=\"detector_inference\",label=~\"$label\"}[5s]))",
           "interval": "100ms",
@@ -27,16 +441,90 @@
       "type": "histogram"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "description": "Absolute deviation of association latency samples from their trailing 5-second mean; sequences for the selected label are combined.",
-      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
-      "gridPos": {"h": 12, "w": 12, "x": 12, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 12,
+        "x": 12,
+        "y": 19
+      },
       "id": 2,
       "maxDataPoints": 20000,
-      "options": {"bucketCount": 30, "combine": true, "fillOpacity": 55, "gradientMode": "opacity", "legend": {"show": true}, "showValue": "never", "tooltip": {"show": true}, "xAxis": {"max": null, "min": 0}, "yAxis": {"axisPlacement": "left", "max": null, "min": 0, "unit": "count"}},
+      "options": {
+        "bucketCount": 30,
+        "combine": true,
+        "fillOpacity": 55,
+        "gradientMode": "opacity",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "show": true,
+          "showLegend": true
+        },
+        "showValue": "never",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "show": true,
+          "sort": "none"
+        },
+        "xAxis": {
+          "min": 0
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "min": 0,
+          "unit": "count"
+        }
+      },
+      "pluginVersion": "12.0.0",
       "targets": [
         {
-          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
           "editorMode": "code",
           "expr": "abs(pipeline_kpi{stage=\"tracker_association\",label=~\"$label\"} - avg_over_time(pipeline_kpi{stage=\"tracker_association\",label=~\"$label\"}[5s]))",
           "interval": "100ms",
@@ -49,86 +537,274 @@
       "type": "histogram"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
-      "description": "TrackEval COMBINED values; one grouped bar per class for HOTA, IDF1, and MOTP.",
-      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
-      "gridPos": {"h": 12, "w": 12, "x": 0, "y": 12},
-      "id": 3,
-      "options": {
-        "barWidth": 0.8,
-        "groupWidth": 0.7,
-        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
-        "orientation": "vertical",
-        "showValue": "always",
-        "stacking": "none",
-        "tooltip": {"mode": "single", "sort": "none"},
-        "xField": "metric\\class"
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 31
       },
-      "targets": [
+      "id": 7,
+      "panels": [
         {
-          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
-          "editorMode": "code",
-          "expr": "avg by (metric, class) (last_over_time(mot_kpi{label=~\"$label\",sequence=\"COMBINED\",metric=~\"HOTA|IDF1|MOTP\"}[31d]))",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "{{class}}",
-          "range": false,
-          "refId": "A"
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "description": "TrackEval COMBINED values; one grouped bar per class for HOTA, IDF1, and MOTP.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "fillOpacity": 80,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineWidth": 1,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 12,
+            "w": 12,
+            "x": 0,
+            "y": 32
+          },
+          "id": 3,
+          "options": {
+            "barRadius": 0,
+            "barWidth": 0.8,
+            "fullHighlight": false,
+            "groupWidth": 0.7,
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "orientation": "vertical",
+            "showValue": "always",
+            "stacking": "none",
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            },
+            "xField": "metric\\class",
+            "xTickLabelRotation": 0,
+            "xTickLabelSpacing": 0
+          },
+          "pluginVersion": "12.0.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "avg by (metric, class) (last_over_time(mot_kpi{label=~\"$label\",sequence=\"COMBINED\",metric=~\"HOTA|IDF1|MOTP\"}[31d]))",
+              "format": "table",
+              "instant": true,
+              "legendFormat": "{{class}}",
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "title": "Tracker KPIs - HOTA, IDF1, MOTP (COMBINED)",
+          "transformations": [
+            {
+              "id": "labelsToFields",
+              "options": {
+                "mode": "columns"
+              }
+            },
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "groupingToMatrix",
+              "options": {
+                "columnField": "class",
+                "rowField": "metric",
+                "valueField": "Value"
+              }
+            }
+          ],
+          "type": "barchart"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "description": "TrackEval COMBINED values; one grouped bar per class for IDSW and Frag.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "fillOpacity": 80,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineWidth": 1,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 12,
+            "w": 12,
+            "x": 12,
+            "y": 32
+          },
+          "id": 4,
+          "options": {
+            "barRadius": 0,
+            "barWidth": 0.8,
+            "fullHighlight": false,
+            "groupWidth": 0.7,
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "orientation": "vertical",
+            "showValue": "always",
+            "stacking": "none",
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            },
+            "xField": "metric\\class",
+            "xTickLabelRotation": 0,
+            "xTickLabelSpacing": 0
+          },
+          "pluginVersion": "12.0.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "avg by (metric, class) (last_over_time(mot_kpi{label=~\"$label\",sequence=\"COMBINED\",metric=~\"IDSW|Frag\"}[31d]))",
+              "format": "table",
+              "instant": true,
+              "legendFormat": "{{class}}",
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "title": "Tracker KPIs - IDSW, Frag (COMBINED)",
+          "transformations": [
+            {
+              "id": "labelsToFields",
+              "options": {
+                "mode": "columns"
+              }
+            },
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "groupingToMatrix",
+              "options": {
+                "columnField": "class",
+                "rowField": "metric",
+                "valueField": "Value"
+              }
+            }
+          ],
+          "type": "barchart"
         }
       ],
-      "title": "Tracker KPIs - HOTA, IDF1, MOTP (COMBINED)",
-      "transformations": [
-        {"id": "labelsToFields", "options": {"mode": "columns"}},
-        {"id": "merge", "options": {}},
-        {"id": "groupingToMatrix", "options": {"columnField": "class", "rowField": "metric", "valueField": "Value"}}
-      ],
-      "type": "barchart"
-    },
-    {
-      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
-      "description": "TrackEval COMBINED values; one grouped bar per class for IDSW and Frag.",
-      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
-      "gridPos": {"h": 12, "w": 12, "x": 12, "y": 12},
-      "id": 4,
-      "options": {
-        "barWidth": 0.8,
-        "groupWidth": 0.7,
-        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
-        "orientation": "vertical",
-        "showValue": "always",
-        "stacking": "none",
-        "tooltip": {"mode": "single", "sort": "none"},
-        "xField": "metric\\class"
-      },
-      "targets": [
-        {
-          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
-          "editorMode": "code",
-          "expr": "avg by (metric, class) (last_over_time(mot_kpi{label=~\"$label\",sequence=\"COMBINED\",metric=~\"IDSW|Frag\"}[31d]))",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "{{class}}",
-          "range": false,
-          "refId": "A"
-        }
-      ],
-      "title": "Tracker KPIs - IDSW, Frag (COMBINED)",
-      "transformations": [
-        {"id": "labelsToFields", "options": {"mode": "columns"}},
-        {"id": "merge", "options": {}},
-        {"id": "groupingToMatrix", "options": {"columnField": "class", "rowField": "metric", "valueField": "Value"}}
-      ],
-      "type": "barchart"
+      "title": "Multi-Object Tracking KPIs",
+      "type": "row"
     }
   ],
+  "preload": false,
   "refresh": "",
   "schemaVersion": 41,
-  "tags": ["ros2", "overview"],
+  "tags": [
+    "ros2",
+    "overview"
+  ],
   "templating": {
     "list": [
       {
-        "current": {"selected": true, "text": "", "value": ""},
-        "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "victoriametrics"
+        },
         "definition": "label_values({__name__=~\"pipeline_kpi|mot_kpi\",label!=\"\"}, label)",
         "includeAll": false,
         "label": "Label",
@@ -140,10 +816,13 @@
       }
     ]
   },
-  "time": {"from": "now-30m", "to": "now"},
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "browser",
   "title": "Overview",
   "uid": "ros2-overview",
-  "version": 1
+  "version": 10
 }

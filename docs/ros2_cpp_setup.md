@@ -196,8 +196,9 @@ time so the final sample is at export time, preserving the spacing between sampl
 Grafana's current time range.
 
 The Compose stack uses VictoriaMetrics v1.155.0 and Grafana 12.0.0. The VictoriaMetrics image is pulled on first
-startup. Three provisioned dashboards are available: `Overview` combines latency-jitter histograms and TrackEval
-`COMBINED` KPIs for the selected label; `Pipeline details` provides a detector-latency heatmap, rolling 5-second
+startup. Three provisioned dashboards are available: `Overview` shows pooled detector-inference mean/p50/p95
+statistics, latency and latency-jitter histograms, and TrackEval `COMBINED` KPIs for the selected label;
+`Pipeline details` provides a detector-latency heatmap, rolling 5-second
 p50/p95/p99, callback-duration histograms, and inter-callback-interval histograms by label and sequence; and
 `A/B Overview` compares two labels with overlaid latency-jitter histograms and side-by-side KPI charts. Automatic
 refresh is disabled on all three dashboards. Latency jitter is shown as the absolute deviation from the trailing
