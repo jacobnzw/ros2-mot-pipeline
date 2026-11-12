@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import math
 import subprocess
 from pathlib import Path
 
@@ -20,6 +21,16 @@ def positive_int(value: str) -> int:
         raise argparse.ArgumentTypeError("must be an integer") from error
     if parsed < 1:
         raise argparse.ArgumentTypeError("must be greater than zero")
+    return parsed
+
+
+def positive_float(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("must be a number") from error
+    if not math.isfinite(parsed) or parsed <= 0:
+        raise argparse.ArgumentTypeError("must be finite and greater than zero")
     return parsed
 
 
@@ -149,11 +160,13 @@ def write_metadata(
     hardware: str,
     precision: str,
     label: str,
+    rate: float,
 ) -> None:
     metadata = {
         "thread_num": thread_num,
         "hardware": hardware,
         "precision": precision,
+        "rate": rate,
         "label": label,
         "label_dir": f"runs/{label}",
         "kitti_gt": f"{kitti_gt}",
@@ -172,6 +185,7 @@ def launch_command(
     thread_num: int,
     precision: str,
     label: str,
+    rate: float,
 ) -> list[str]:
     return [
         "ros2",
@@ -182,6 +196,7 @@ def launch_command(
         f"label:={label}",
         f"precision:={precision}",
         f"kitti_root:={kitti_root}",
+        f"rate:={rate}",
     ]
 
 
@@ -194,6 +209,7 @@ def main() -> int:
     parser.add_argument("--thread-num", type=positive_int, required=True, help="Detector container thread count")
     parser.add_argument("--precision", required=True, help="Detector model export precision, e.g. fp32 or fp16")
     parser.add_argument("--label", required=True, help="Run label used for recording and metadata directories")
+    parser.add_argument("--rate", type=positive_float, default=1.0, help="MCAP playback rate multiplier (default: 1.0)")
     parser.add_argument(
         "--seq",
         type=parse_sequences,
@@ -228,6 +244,7 @@ def main() -> int:
             hardware,
             args.precision,
             args.label,
+            args.rate,
         )
     except (OSError, ValueError, RuntimeError) as error:
         parser.error(f"could not prepare run metadata or TrackEval ground truth: {error}")
@@ -235,7 +252,7 @@ def main() -> int:
     print(f"Hardware: {hardware}")
     print(f"Metadata: {metadata_path}")
     for sequence in sequences:
-        command = launch_command(sequence.name, kitti_root, args.thread_num, args.precision, args.label)
+        command = launch_command(sequence.name, kitti_root, args.thread_num, args.precision, args.label, args.rate)
         print(f"\n==> Running KITTI sequence {sequence.name}", flush=True)
         result = subprocess.run(command, cwd=repository_root, check=False)
         if result.returncode != 0:

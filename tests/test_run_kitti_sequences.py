@@ -14,6 +14,7 @@ from scripts.eval.run_kitti_sequences import (
     identify_hardware,
     launch_command,
     parse_sequences,
+    positive_float,
     write_metadata,
 )
 
@@ -69,6 +70,12 @@ class RunKittiSequencesTests(unittest.TestCase):
         with self.assertRaisesRegex(argparse.ArgumentTypeError, "must not be repeated"):
             parse_sequences("0019,0019")
 
+    def test_playback_rate_must_be_finite_and_positive(self) -> None:
+        self.assertEqual(positive_float("1.5"), 1.5)
+        for value in ("0", "-1", "nan", "inf", "not-a-number"):
+            with self.subTest(value=value), self.assertRaises(argparse.ArgumentTypeError):
+                positive_float(value)
+
     def test_writes_metadata_with_expected_fields(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -87,6 +94,7 @@ class RunKittiSequencesTests(unittest.TestCase):
                 "rtx3090",
                 "fp16",
                 "nightly-run",
+                1.5,
             )
 
             self.assertEqual(
@@ -95,6 +103,7 @@ class RunKittiSequencesTests(unittest.TestCase):
                     "thread_num": 4,
                     "hardware": "rtx3090",
                     "precision": "fp16",
+                    "rate": 1.5,
                     "label": "nightly-run",
                     "label_dir": "runs/nightly-run",
                     "kitti_gt": str(kitti_gt),
@@ -106,7 +115,7 @@ class RunKittiSequencesTests(unittest.TestCase):
 
     def test_builds_ros_launch_command_with_all_run_arguments(self) -> None:
         self.assertEqual(
-            launch_command("0019", Path("/dataset/mcaps"), 4, "fp16", "nightly"),
+            launch_command("0019", Path("/dataset/mcaps"), 4, "fp16", "nightly", 1.5),
             [
                 "ros2",
                 "launch",
@@ -116,6 +125,7 @@ class RunKittiSequencesTests(unittest.TestCase):
                 "label:=nightly",
                 "precision:=fp16",
                 "kitti_root:=/dataset/mcaps",
+                "rate:=1.5",
             ],
         )
 
@@ -132,6 +142,7 @@ class RunKittiSequencesTests(unittest.TestCase):
                 "jetson",
                 "fp16",
                 'baseline: "nightly"',
+                1.0,
             )
 
             self.assertEqual(

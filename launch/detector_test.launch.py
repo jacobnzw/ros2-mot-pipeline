@@ -19,6 +19,7 @@ loop = LaunchConfiguration("loop")
 seq = LaunchConfiguration("seq")
 kitti_root = LaunchConfiguration("kitti_root")
 label = LaunchConfiguration("label")
+rate = LaunchConfiguration("rate")
 timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 recording_path = PathJoinSubstitution(
     [
@@ -34,7 +35,7 @@ def generate_launch_description():
     def create_bag_player(context: LaunchContext) -> list[ExecuteProcess | RegisterEventHandler]:
         sequence = seq.perform(context)
         mcap_path = Path(kitti_root.perform(context)).expanduser() / sequence / f"{sequence}.mcap"
-        command = ["ros2", "bag", "play", str(mcap_path), "--clock", "--rate", "1.0"]
+        command = ["ros2", "bag", "play", str(mcap_path), "--clock", "--rate", rate.perform(context)]
         if loop.perform(context).lower() == "true":
             command.append("--loop")
         bag_player = ExecuteProcess(cmd=command, name="kitty_player", output="screen")
@@ -154,6 +155,11 @@ def generate_launch_description():
                 default_value="false",
                 choices=["true", "false"],
                 description="Whether to loop MCAP playback indefinitely.",
+            ),
+            DeclareLaunchArgument(
+                "rate",
+                default_value="1.0",
+                description="MCAP playback rate multiplier.",
             ),
             DeclareLaunchArgument(
                 "seq",
