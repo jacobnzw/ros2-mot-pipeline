@@ -20,6 +20,7 @@ seq = LaunchConfiguration("seq")
 kitti_root = LaunchConfiguration("kitti_root")
 label = LaunchConfiguration("label")
 rate = LaunchConfiguration("rate")
+precision = LaunchConfiguration("precision")
 timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 recording_path = PathJoinSubstitution(
     [
@@ -47,50 +48,54 @@ def generate_launch_description():
         )
         return [bag_player, shutdown_on_bag_exit]
 
-    composable_nodes = [
-        ComposableNode(
-            package="object_tracker",
-            plugin="object_tracker::YoloDetectorComponent",
-            name="detector",
-            parameters=[
-                {
-                    "use_sim_time": True,
-                    "model_path": "models/yolo/yolo11n_fp32.onnx",
-                    "image_topic": "/camera/image_raw/compressed",
-                    "detection_topic": "/detections",
-                    "log_input_image": log_input_image,
-                    "log_detections": log_detections,
-                    "recording_path": recording_path,
-                }
-            ],
-            extra_arguments=[{"use_intra_process_comms": True}],
-        ),
-        # Timed detections used as observations for forming tracks output as TrackedObjectArray
-        ComposableNode(
-            package="object_tracker",
-            plugin="object_tracker::TrackerComponent",
-            name="tracker",
-            parameters=[
-                {
-                    "use_sim_time": True,
-                    "detections_topic": "/detections",
-                    "tracks_topic": "~/tracks",
-                    "high_threshold": 0.25,  # detections above this take part in the first association
-                    "low_threshold": 0.1,  # (low, high) detections only rescue existing tracks
-                    "new_track_threshold": 0.25,  # minimum score to start a new track
-                    "match_threshold": 0.8,  # max (1 - IoU) cost in the first association
-                    "track_buffer": 10,  # frames a lost track is kept for re-identification
-                    "frame_rate": 10.0,
-                    "fuse_score": True,
-                    "log_tracks": log_tracks,
-                    "recording_path": recording_path,
-                }
-            ],
-            extra_arguments=[{"use_intra_process_comms": True}],
-        ),
-    ]
-
     def create_tracker_container(context: LaunchContext) -> list[ComposableNodeContainer]:
+        model_precision = precision.perform(context).lower()
+        model_path = Path(__file__).resolve().parents[1] / "models" / "yolo" / f"yolo11n_{model_precision}.onnx"
+        if not model_path.is_file():
+            raise FileNotFoundError(f"Detector model does not exist: {model_path}")
+
+        composable_nodes = [
+            ComposableNode(
+                package="object_tracker",
+                plugin="object_tracker::YoloDetectorComponent",
+                name="detector",
+                parameters=[
+                    {
+                        "use_sim_time": True,
+                        "model_path": str(model_path),
+                        "image_topic": "/camera/image_raw/compressed",
+                        "detection_topic": "/detections",
+                        "log_input_image": log_input_image,
+                        "log_detections": log_detections,
+                        "recording_path": recording_path,
+                    }
+                ],
+                extra_arguments=[{"use_intra_process_comms": True}],
+            ),
+            # Timed detections used as observations for forming tracks output as TrackedObjectArray
+            ComposableNode(
+                package="object_tracker",
+                plugin="object_tracker::TrackerComponent",
+                name="tracker",
+                parameters=[
+                    {
+                        "use_sim_time": True,
+                        "detections_topic": "/detections",
+                        "tracks_topic": "~/tracks",
+                        "high_threshold": 0.25,  # detections above this take part in the first association
+                        "low_threshold": 0.1,  # (low, high) detections only rescue existing tracks
+                        "new_track_threshold": 0.25,  # minimum score to start a new track
+                        "match_threshold": 0.8,  # max (1 - IoU) cost in the first association
+                        "track_buffer": 10,  # frames a lost track is kept for re-identification
+                        "frame_rate": 10.0,
+                        "fuse_score": True,
+                        "log_tracks": log_tracks,
+                        "recording_path": recording_path,
+                    }
+                ],
+                extra_arguments=[{"use_intra_process_comms": True}],
+            ),
+        ]
         thread_count = int(thread_num.perform(context))
         arguments = ["--ros-args", "--log-level", log_level.perform(context)]
         executable = "component_container"
@@ -143,12 +148,11 @@ def generate_launch_description():
                 default_value="1",
                 description="Number of threads to use. If > 1 multi-threaded executor is used.",
             ),
-            # TODO: hook up to model path selection when quantization script finished.
             DeclareLaunchArgument(
                 "precision",
                 default_value="fp32",
-                choices=["fp32", "fp16", "int8"],
-                description="Detector model export precision (currently informational; does not select a model).",
+                choices=["fp32", "fp16", "int8", "FP32", "FP16", "INT8"],
+                description="Detector model precision; selects models/yolo/yolo11n_<precision>.onnx.",
             ),
             DeclareLaunchArgument(
                 "loop",

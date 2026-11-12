@@ -135,7 +135,8 @@ root with ROS 2 launch arguments (which use `name:=value` syntax rather than `--
 ros2 launch launch/detector_test.launch.py seq:=0020 \
   kitti_root:=/path/to/image_02_mcap \
   label:=baseline \
-  rate:=1.5
+  rate:=1.5 \
+  precision:=fp16
 ```
 
 To run every sequence directory in an MCAP root sequentially, use the batch runner:
@@ -150,7 +151,9 @@ uv run scripts/eval/run_kitti_sequences.py \
 detects Jetson or RTX 3090 hardware, writes `runs/<label>/metadata.yaml` with the run configuration, and stops if a
 sequence launch fails. `--rate` sets the MCAP playback speed and defaults to `1.0`. Pass `--loop` to loop playback
 indefinitely; in that mode, the runner will not proceed to the next sequence. The `precision` launch argument is
-currently informational and does not change the detector model path.
+selects `models/yolo/yolo11n_<precision>.onnx` (for example, `precision:=FP32` selects
+`models/yolo/yolo11n_fp32.onnx`). Precision values may be lowercase or uppercase, and the selected model file must
+exist.
 
 The C++ SDK fetched by CMake writes Rerun data, but does not install the standalone Rerun viewer/CLI. Install the viewer
 separately, for example with `uv tool install rerun-sdk` (see the
