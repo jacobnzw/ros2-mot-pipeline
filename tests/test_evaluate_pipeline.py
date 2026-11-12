@@ -46,6 +46,23 @@ class EvaluatePipelineTests(unittest.TestCase):
         )
         return metadata_path
 
+    def test_label_selects_run_metadata_from_repository_runs_directory(self) -> None:
+        results = {"pipeline_kpi_csvs": [], "tracker_kpi_csv": Path("tracker_kpi.csv")}
+        with (
+            patch("sys.argv", ["evaluate_pipeline.py", "--label", "baseline"]),
+            patch.object(evaluate_pipeline, "_build_driver") as build_driver,
+        ):
+            build_driver.return_value.execute.return_value = results
+
+            self.assertEqual(evaluate_pipeline._main(), 0)
+
+        repository_root = Path(evaluate_pipeline.__file__).resolve().parents[2]
+        build_driver.assert_called_once_with(4)
+        build_driver.return_value.execute.assert_called_once_with(
+            ["pipeline_kpi_csvs", "tracker_kpi_csv"],
+            inputs={"metadata_path": repository_root / "runs" / "baseline" / "metadata.yaml"},
+        )
+
     def test_metadata_resolves_run_and_ground_truth_directories(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             metadata_path = self._create_run(Path(directory), ())

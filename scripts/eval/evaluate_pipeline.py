@@ -221,7 +221,9 @@ def _main() -> int:
     parser = argparse.ArgumentParser(
         description="Extract pipeline and tracker KPIs for a detector run using an Apache Hamilton DAG."
     )
-    parser.add_argument("metadata", type=Path, help="Run metadata YAML, e.g. runs/<label>/metadata.yaml")
+    metadata_group = parser.add_mutually_exclusive_group(required=True)
+    metadata_group.add_argument("--metadata", type=Path, help="Path to the run metadata YAML")
+    metadata_group.add_argument("--label", help="Run label; loads runs/<label>/metadata.yaml from the repository root")
     parser.add_argument(
         "--max-workers",
         type=_positive_int,
@@ -230,9 +232,16 @@ def _main() -> int:
     )
     args = parser.parse_args()
 
+    if args.label is not None:
+        if not args.label or args.label in {".", ".."} or "/" in args.label or "\\" in args.label:
+            parser.error("--label must be a non-empty directory name without path separators")
+        metadata_path = Path(__file__).resolve().parents[2] / "runs" / args.label / "metadata.yaml"
+    else:
+        metadata_path = args.metadata
+
     results = _build_driver(args.max_workers).execute(
         ["pipeline_kpi_csvs", "tracker_kpi_csv"],
-        inputs={"metadata_path": args.metadata},
+        inputs={"metadata_path": metadata_path},
     )
     print("Pipeline KPI CSVs:")
     for path in results["pipeline_kpi_csvs"]:

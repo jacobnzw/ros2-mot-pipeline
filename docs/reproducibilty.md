@@ -221,8 +221,10 @@ After `scripts/eval/run_kitti_sequences.py` has created the recordings and `meta
 whole run:
 
 ```shell
-uv run scripts/eval/evaluate_pipeline.py runs/<run-id>/metadata.yaml
+uv run scripts/eval/evaluate_pipeline.py --label <run-id>
 ```
+
+Alternatively, pass an explicit metadata path with `--metadata runs/<run-id>/metadata.yaml`.
 
 `run_kitti_sequences.py` creates `runs/<run-id>/eval/label_02` as a symlink to the configured KITTI labels and generates
 `runs/<run-id>/eval/evaluate_tracking.seqmap.training`. It counts image messages in each selected MCAP for the seqmap's
