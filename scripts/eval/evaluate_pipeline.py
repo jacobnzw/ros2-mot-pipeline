@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +23,7 @@ class RunMetadata:
     label_dir: Path
     hardware: str
     precision: str
+    rate: float
     trackeval_gt: Path
 
 
@@ -56,6 +58,13 @@ def _required_string(metadata: dict[str, Any], key: str) -> str:
     return value
 
 
+def _metadata_rate(metadata: dict[str, Any]) -> float:
+    value = metadata.get("rate", 1.0)
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+        raise ValueError("metadata field 'rate' must be a finite number greater than zero")
+    return float(value)
+
+
 def run_metadata(metadata_path: Path) -> RunMetadata:
     metadata_path = metadata_path.expanduser().resolve()
     if not metadata_path.is_file():
@@ -73,6 +82,7 @@ def run_metadata(metadata_path: Path) -> RunMetadata:
 
     hardware = _required_string(metadata, "hardware")
     precision = _required_string(metadata, "precision")
+    rate = _metadata_rate(metadata)
     trackeval_gt = _resolve_metadata_path(_required_string(metadata, "trackeval_gt"), metadata_path)
     if not (trackeval_gt / "label_02").is_dir():
         raise ValueError(f"TrackEval ground-truth folder must contain label_02/: {trackeval_gt}")
@@ -87,6 +97,7 @@ def run_metadata(metadata_path: Path) -> RunMetadata:
         label_dir=label_dir,
         hardware=hardware,
         precision=precision,
+        rate=rate,
         trackeval_gt=trackeval_gt,
     )
 

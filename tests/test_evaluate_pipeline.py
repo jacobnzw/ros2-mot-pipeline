@@ -35,6 +35,7 @@ class EvaluatePipelineTests(unittest.TestCase):
                     "thread_num": 2,
                     "hardware": "rtx3090",
                     "precision": "fp16",
+                    "rate": 1.5,
                     "label": "baseline",
                     "label_dir": "runs/baseline",
                     "trackeval_gt": str(eval_folder),
@@ -52,7 +53,29 @@ class EvaluatePipelineTests(unittest.TestCase):
 
             self.assertEqual(metadata.label, "baseline")
             self.assertEqual(metadata.label_dir, metadata_path.parent)
+            self.assertEqual(metadata.rate, 1.5)
             self.assertEqual(metadata.trackeval_gt, metadata_path.parent / "eval")
+
+    def test_metadata_defaults_missing_playback_rate_to_one(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            metadata_path = self._create_run(Path(directory), ())
+            metadata_content = yaml.safe_load(metadata_path.read_text(encoding="utf-8"))
+            metadata_content.pop("rate")
+            metadata_path.write_text(yaml.safe_dump(metadata_content), encoding="utf-8")
+
+            metadata = evaluate_pipeline.run_metadata(metadata_path)
+
+            self.assertEqual(metadata.rate, 1.0)
+
+    def test_metadata_rejects_invalid_playback_rate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            metadata_path = self._create_run(Path(directory), ())
+            metadata_content = yaml.safe_load(metadata_path.read_text(encoding="utf-8"))
+            metadata_content["rate"] = 0
+            metadata_path.write_text(yaml.safe_dump(metadata_content), encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "rate.*finite number greater than zero"):
+                evaluate_pipeline.run_metadata(metadata_path)
 
     def test_recording_jobs_discover_sequences_from_run_directory_names(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

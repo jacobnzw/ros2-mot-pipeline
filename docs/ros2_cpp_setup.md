@@ -148,7 +148,8 @@ uv run scripts/eval/run_kitti_sequences.py \
 `--kitti-root` defaults to `data/kitti/left_color/training/image_02_mcap`; each sequence folder must contain
 `<sequence>/<sequence>.mcap`. Optionally pass `--seq 0019,0020` to run only the listed sequences. The batch runner
 detects Jetson or RTX 3090 hardware, writes `runs/<label>/metadata.yaml` with the run configuration, and stops if a
-sequence launch fails. `--rate` sets the MCAP playback speed and defaults to `1.0`. The `precision` launch argument is
+sequence launch fails. `--rate` sets the MCAP playback speed and defaults to `1.0`. Pass `--loop` to loop playback
+indefinitely; in that mode, the runner will not proceed to the next sequence. The `precision` launch argument is
 currently informational and does not change the detector model path.
 
 The C++ SDK fetched by CMake writes Rerun data, but does not install the standalone Rerun viewer/CLI. Install the viewer
