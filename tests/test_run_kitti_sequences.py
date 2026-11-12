@@ -115,7 +115,7 @@ class RunKittiSequencesTests(unittest.TestCase):
 
     def test_builds_ros_launch_command_with_all_run_arguments(self) -> None:
         self.assertEqual(
-            launch_command("0019", Path("/dataset/mcaps"), 4, "fp16", "nightly", 1.5),
+            launch_command("0019", Path("/dataset/mcaps"), 4, "fp16", "nightly", 1.5, True),
             [
                 "ros2",
                 "launch",
@@ -126,8 +126,14 @@ class RunKittiSequencesTests(unittest.TestCase):
                 "precision:=fp16",
                 "kitti_root:=/dataset/mcaps",
                 "rate:=1.5",
+                "loop:=true",
             ],
         )
+
+    def test_builds_ros_launch_command_without_loop_by_default(self) -> None:
+        command = launch_command("0019", Path("/dataset/mcaps"), 1, "fp32", "baseline", 1.0)
+
+        self.assertIn("loop:=false", command)
 
     def test_metadata_quotes_yaml_special_characters(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

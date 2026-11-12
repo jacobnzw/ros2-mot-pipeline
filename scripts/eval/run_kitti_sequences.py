@@ -186,6 +186,7 @@ def launch_command(
     precision: str,
     label: str,
     rate: float,
+    loop: bool = False,
 ) -> list[str]:
     return [
         "ros2",
@@ -197,6 +198,7 @@ def launch_command(
         f"precision:={precision}",
         f"kitti_root:={kitti_root}",
         f"rate:={rate}",
+        f"loop:={str(loop).lower()}",
     ]
 
 
@@ -210,6 +212,7 @@ def main() -> int:
     parser.add_argument("--precision", required=True, help="Detector model export precision, e.g. fp32 or fp16")
     parser.add_argument("--label", required=True, help="Run label used for recording and metadata directories")
     parser.add_argument("--rate", type=positive_float, default=1.0, help="MCAP playback rate multiplier (default: 1.0)")
+    parser.add_argument("--loop", action="store_true", help="Loop MCAP playback indefinitely")
     parser.add_argument(
         "--seq",
         type=parse_sequences,
@@ -252,7 +255,15 @@ def main() -> int:
     print(f"Hardware: {hardware}")
     print(f"Metadata: {metadata_path}")
     for sequence in sequences:
-        command = launch_command(sequence.name, kitti_root, args.thread_num, args.precision, args.label, args.rate)
+        command = launch_command(
+            sequence.name,
+            kitti_root,
+            args.thread_num,
+            args.precision,
+            args.label,
+            args.rate,
+            args.loop,
+        )
         print(f"\n==> Running KITTI sequence {sequence.name}", flush=True)
         result = subprocess.run(command, cwd=repository_root, check=False)
         if result.returncode != 0:
