@@ -129,8 +129,8 @@ def run_trackeval(
             "USE_PARALLEL": True,
             "PRINT_RESULTS": False,
             "PRINT_CONFIG": False,
-            "OUTPUT_SUMMARY": False,
-            "OUTPUT_DETAILED": False,
+            "OUTPUT_SUMMARY": True,
+            "OUTPUT_DETAILED": True,
             "PLOT_CURVES": False,
             "LOG_ON_ERROR": None,
         }

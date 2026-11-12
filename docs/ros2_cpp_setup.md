@@ -180,9 +180,9 @@ scripts/analyse.sh runs/<run-id>/recording.rrd \
 The script writes `latency.csv` beside the recording and, if TrackEval detailed results are present under the same run
 folder, writes `trackeval.csv` there too. It starts the Compose services, waits for them to respond, and imports both
 CSVs into VictoriaMetrics. Latency rows have columns `timestamp_ms,run,stage,hardware,precision,sequence,label,value`
-and become `latency_ms` samples. The `--hw`, `--precision`, `--seq`, and `--label` options populate the corresponding
+and become `pipeline_kpi` samples. The `--hw`, `--precision`, `--seq`, and `--label` options populate the corresponding
 metadata labels; they default to empty strings. TrackEval rows have columns
-`timestamp_ms,run,hardware,precision,label,tracker,sequence,class,metric,value` and become `trackeval_kpi` samples with
+`timestamp_ms,run,hardware,precision,label,tracker,sequence,class,metric,value` and become `mot_kpi` samples with
 run/hardware/precision/label/tracker/sequence/class/metric labels. TrackEval timestamps use the newest detailed-results
 file modification time; score values are ratios in `[0, 1]`, while count metrics remain counts. The run label defaults
 to the recording directory name; pass an optional second argument to `analyse.sh` to override it. The stage label comes
@@ -196,12 +196,15 @@ time so the final sample is at export time, preserving the spacing between sampl
 Grafana's current time range.
 
 The Compose stack uses VictoriaMetrics v1.155.0 and Grafana 12.0.0. The VictoriaMetrics image is pulled on first
-startup. The provisioned `ROS 2 Latency Analysis` dashboard includes a detector-inference heatmap (5-second X buckets
-and 25 latency buckets), rolling 5-second p50/p95/p99 inference latency, an overall histogram for a selectable stage,
-and a TrackEval KPI table for the selected run. The KPI table includes per-sequence and `COMBINED` values. Select the
-imported run in the dashboard's `Run` variable; the `Stage` variable controls the histogram panel. The Prometheus data
-source uses a 100 ms minimum query interval to retain approximately the original 10 Hz sample resolution for the heatmap
-and histogram.
+startup. Three provisioned dashboards are available: `Overview` shows pooled detector-inference mean/p50/p95
+statistics, latency and latency-jitter histograms, and TrackEval `COMBINED` KPIs for the selected label;
+`Pipeline details` provides a detector-latency heatmap, rolling 5-second
+p50/p95/p99, callback-duration histograms, and inter-callback-interval histograms by label and sequence; and
+`A/B Overview` compares two labels with overlaid latency-jitter histograms and side-by-side KPI charts. Automatic
+refresh is disabled on all three dashboards. Latency jitter is shown as the absolute deviation from the trailing
+5-second mean. KPI charts use TrackEval's `COMBINED` sequence values, while pipeline detail panels can select an
+individual sequence or all sequences. The Prometheus data source uses a 100 ms minimum query interval to retain
+approximately the original 10 Hz sample resolution for the heatmap and histograms.
 
 VictoriaMetrics data and Grafana state persist in Docker named volumes across container restarts. VictoriaMetrics
 retains data for 31 days. Services bind to localhost only; Grafana's initial local credentials are `admin` / `admin`.

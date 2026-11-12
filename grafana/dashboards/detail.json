@@ -1,0 +1,210 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Detector inference latency samples, grouped into 5-second time buckets.",
+      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
+      "gridPos": {"h": 14, "w": 24, "x": 0, "y": 0},
+      "id": 1,
+      "maxDataPoints": 20000,
+      "options": {
+        "calculate": true,
+        "cellGap": 1,
+        "color": {"exponent": 0.5, "fill": "dark-orange", "mode": "scheme", "scale": "exponential", "scheme": "Oranges", "steps": 64},
+        "legend": {"show": true},
+        "rowsFrame": {"layout": "auto"},
+        "showValue": "never",
+        "tooltip": {"show": true, "yHistogram": false, "yHistogramBuckets": 50},
+        "xAxis": {"mode": "time", "name": "Time"},
+        "xBucket": {"mode": "size", "value": "5s"},
+        "yAxis": {"axisPlacement": "left", "decimals": null, "max": null, "min": 0, "name": "Detector latency", "reverse": false, "unit": "ms"},
+        "yBucket": {"mode": "count", "value": 25}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "pipeline_kpi{stage=\"detector_inference\",label=~\"$label\",sequence=~\"$sequence\"}",
+          "interval": "100ms",
+          "legendFormat": "{{sequence}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Row 1 - Detector latency heatmap",
+      "type": "heatmap"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Rolling 5-second percentiles of detector inference latency.",
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "lineWidth": 2, "showPoints": "never"}, "unit": "ms"}, "overrides": []},
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 14},
+      "id": 2,
+      "maxDataPoints": 20000,
+      "options": {
+        "legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi", "sort": "asc"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "quantile_over_time(0.50, pipeline_kpi{stage=\"detector_inference\",label=~\"$label\",sequence=~\"$sequence\"}[5s])",
+          "interval": "100ms",
+          "legendFormat": "p50",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "quantile_over_time(0.95, pipeline_kpi{stage=\"detector_inference\",label=~\"$label\",sequence=~\"$sequence\"}[5s])",
+          "interval": "100ms",
+          "legendFormat": "p95",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "quantile_over_time(0.99, pipeline_kpi{stage=\"detector_inference\",label=~\"$label\",sequence=~\"$sequence\"}[5s])",
+          "interval": "100ms",
+          "legendFormat": "p99",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Row 2 - Detector latency percentiles",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Distribution of detector callback duration samples.",
+      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
+      "gridPos": {"h": 10, "w": 12, "x": 0, "y": 23},
+      "id": 3,
+      "maxDataPoints": 20000,
+      "options": {"bucketCount": 30, "combine": true, "fillOpacity": 80, "gradientMode": "opacity", "legend": {"show": false}, "showValue": "never", "tooltip": {"show": true}, "xAxis": {"max": null, "min": null}, "yAxis": {"axisPlacement": "left", "max": null, "min": 0, "unit": "count"}},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "pipeline_kpi{stage=\"detector_callback_duration\",label=~\"$label\",sequence=~\"$sequence\"}",
+          "interval": "100ms",
+          "legendFormat": "detector",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Row 3 - Detector callback duration",
+      "type": "histogram"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Distribution of tracker callback duration samples.",
+      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
+      "gridPos": {"h": 10, "w": 12, "x": 12, "y": 23},
+      "id": 4,
+      "maxDataPoints": 20000,
+      "options": {"bucketCount": 30, "combine": true, "fillOpacity": 80, "gradientMode": "opacity", "legend": {"show": false}, "showValue": "never", "tooltip": {"show": true}, "xAxis": {"max": null, "min": null}, "yAxis": {"axisPlacement": "left", "max": null, "min": 0, "unit": "count"}},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "pipeline_kpi{stage=\"tracker_callback_duration\",label=~\"$label\",sequence=~\"$sequence\"}",
+          "interval": "100ms",
+          "legendFormat": "tracker",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Row 3 - Tracker callback duration",
+      "type": "histogram"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Distribution of detector inter-callback interval samples.",
+      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
+      "gridPos": {"h": 10, "w": 12, "x": 0, "y": 33},
+      "id": 5,
+      "maxDataPoints": 20000,
+      "options": {"bucketCount": 30, "combine": true, "fillOpacity": 80, "gradientMode": "opacity", "legend": {"show": false}, "showValue": "never", "tooltip": {"show": true}, "xAxis": {"max": null, "min": null}, "yAxis": {"axisPlacement": "left", "max": null, "min": 0, "unit": "count"}},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "pipeline_kpi{stage=\"detector_callback_interval\",label=~\"$label\",sequence=~\"$sequence\"}",
+          "interval": "100ms",
+          "legendFormat": "detector",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Row 3 - Detector inter-callback interval",
+      "type": "histogram"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Distribution of tracker inter-callback interval samples.",
+      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
+      "gridPos": {"h": 10, "w": 12, "x": 12, "y": 33},
+      "id": 6,
+      "maxDataPoints": 20000,
+      "options": {"bucketCount": 30, "combine": true, "fillOpacity": 80, "gradientMode": "opacity", "legend": {"show": false}, "showValue": "never", "tooltip": {"show": true}, "xAxis": {"max": null, "min": null}, "yAxis": {"axisPlacement": "left", "max": null, "min": 0, "unit": "count"}},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "pipeline_kpi{stage=\"tracker_callback_interval\",label=~\"$label\",sequence=~\"$sequence\"}",
+          "interval": "100ms",
+          "legendFormat": "tracker",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Row 3 - Tracker inter-callback interval",
+      "type": "histogram"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 41,
+  "tags": ["ros2", "pipeline"],
+  "templating": {
+    "list": [
+      {
+        "current": {"selected": true, "text": "", "value": ""},
+        "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+        "definition": "label_values(pipeline_kpi{label!=\"\"}, label)",
+        "includeAll": false,
+        "label": "Label",
+        "name": "label",
+        "options": [],
+        "query": "label_values(pipeline_kpi{label!=\"\"}, label)",
+        "refresh": 2,
+        "type": "query"
+      },
+      {
+        "current": {"selected": true, "text": "", "value": ""},
+        "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+        "definition": "label_values(pipeline_kpi{label=~\"$label\"}, sequence)",
+        "includeAll": false,
+        "label": "Sequence",
+        "name": "sequence",
+        "options": [],
+        "query": "label_values(pipeline_kpi{label=~\"$label\"}, sequence)",
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {"from": "now-30m", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Pipeline details",
+  "uid": "ros2-latency",
+  "version": 3
+}
