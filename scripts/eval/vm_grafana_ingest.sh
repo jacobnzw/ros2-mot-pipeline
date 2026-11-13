@@ -86,8 +86,8 @@ import_csv() {
   echo
 }
 
-pipeline_format="1:time:unix_ms,2:label:run,3:label:stage,4:label:hardware,5:label:precision,6:label:rate,7:label:sequence,8:label:config,9:metric:pipeline_kpi"
-tracker_format="1:time:unix_ms,2:label:hardware,3:label:precision,4:label:rate,5:label:config,6:label:tracker,7:label:sequence,8:label:class,9:label:metric,10:metric:mot_kpi"
+pipeline_format="1:time:unix_ms,2:label:run,3:label:name,4:label:hardware,5:label:precision,6:label:n_threads,7:label:rate,8:label:sequence,9:label:config,10:metric:pipeline_kpi"
+tracker_format="1:time:unix_ms,2:label:hardware,3:label:precision,4:label:n_threads,5:label:rate,6:label:config,7:label:tracker,8:label:sequence,9:label:class,10:label:metric,11:metric:mot_kpi"
 
 for csv_path in "${pipeline_csvs[@]}"; do
   import_csv "$csv_path" "$pipeline_format"

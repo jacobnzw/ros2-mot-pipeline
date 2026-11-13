@@ -19,16 +19,16 @@ EARLIEST_EXPECTED_UNIX_TIMESTAMP_MS = 946_684_800_000
 @dataclass(frozen=True)
 class Sample:
     timestamp_ns: int
-    stage: str
+    name: str
     value: float
 
 
-def stage_from_entity_path(entity_path: str) -> str | None:
-    stage = entity_path.strip("/").replace("/", "_")
-    if stage.endswith("_latency_ms"):
-        return stage[: -len("_latency_ms")] + "_ms"
-    if stage.endswith(("_duration_ms", "_interval_ms")):
-        return stage
+def name_from_entity_path(entity_path: str) -> str | None:
+    name = entity_path.strip("/").replace("/", "_")
+    if name.endswith("_latency_ms"):
+        return name[: -len("_latency_ms")] + "_ms"
+    if name.endswith(("_duration_ms", "_interval_ms")):
+        return name
     return None
 
 
@@ -46,8 +46,8 @@ def read_latency_samples(recording_path: Path) -> list[Sample]:
     samples: list[Sample] = []
 
     for chunk in stream:
-        stage = stage_from_entity_path(chunk.entity_path)
-        if stage is None:
+        name = name_from_entity_path(chunk.entity_path)
+        if name is None:
             continue
 
         batch = chunk.to_record_batch()
@@ -62,7 +62,7 @@ def read_latency_samples(recording_path: Path) -> list[Sample]:
 
             timestamp_ns = timestamp.value
             samples.extend(
-                Sample(timestamp_ns, stage, float(value))
+                Sample(timestamp_ns, name, float(value))
                 for value in row_values
                 if value is not None and math.isfinite(float(value))
             )
@@ -86,6 +86,7 @@ def write_csv(
     rate: float = 1.0,
     sequence: str = "",
     config: str = "",
+    n_threads: int | None = None,
 ) -> None:
     if not samples:
         raise ValueError("recording contains no finite latency or duration scalar samples")
@@ -103,9 +104,10 @@ def write_csv(
                 (
                     timestamp_to_unix_ms(sample.timestamp_ns, min_timestamp_ns, max_timestamp_ns, export_time_ms),
                     run_id,
-                    sample.stage,
+                    sample.name,
                     hardware,
                     precision,
+                    "" if n_threads is None else n_threads,
                     rate,
                     sequence,
                     config,
@@ -131,10 +133,13 @@ def main() -> None:
     )
     parser.add_argument("--hw", default="", help="Hardware value")
     parser.add_argument("--precision", default="", help="Detector precision value")
+    parser.add_argument("--n-threads", type=int, help="Number of detector container threads")
     parser.add_argument("--rate", default="1.0", help="Playback rate value")
     parser.add_argument("--seq", default="", help="Sequence value")
     parser.add_argument("--config", default="", help="Value for the VictoriaMetrics config metric label key")
     args = parser.parse_args()
+    if args.n_threads is not None and args.n_threads < 1:
+        parser.error("--n-threads must be greater than zero")
 
     recording_path = args.recording.expanduser()
     if not recording_path.is_file():
@@ -159,6 +164,7 @@ def main() -> None:
             run_id,
             hardware=args.hw,
             precision=args.precision,
+            n_threads=args.n_threads,
             rate=float(args.rate),
             sequence=args.seq,
             config=args.config,

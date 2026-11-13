@@ -156,17 +156,19 @@ def write_metadata(
     kitti_gt: Path,
     trackeval_gt: Path,
     trackeval_seqmap: Path,
-    thread_num: int,
+    n_threads: int,
     hardware: str,
     precision: str,
     config: str,
     rate: float,
+    sequences: list[str],
 ) -> None:
     metadata = {
-        "thread_num": thread_num,
+        "n_threads": n_threads,
         "hardware": hardware,
         "precision": precision,
         "rate": rate,
+        "sequences": sequences,
         "config": config,
         "config_dir": f"runs/{config}",
         "kitti_gt": f"{kitti_gt}",
@@ -182,7 +184,7 @@ def write_metadata(
 def launch_command(
     sequence: str,
     kitti_root: Path,
-    thread_num: int,
+    n_threads: int,
     precision: str,
     config: str,
     rate: float,
@@ -192,7 +194,7 @@ def launch_command(
         "ros2",
         "launch",
         "launch/detector_test.launch.py",
-        f"thread_num:={thread_num}",
+        f"n_threads:={n_threads}",
         f"seq:={sequence}",
         f"label:={config}",
         f"precision:={precision}",
@@ -208,7 +210,7 @@ def main() -> int:
     parser.add_argument(
         "--kitti-gt", type=Path, default=DEFAULT_KITTI_GT, help="Root containing ground truth TXT file per sequence."
     )
-    parser.add_argument("--thread-num", type=positive_int, required=True, help="Detector container thread count")
+    parser.add_argument("--n-threads", type=positive_int, required=True, help="Detector container thread count")
     parser.add_argument("--precision", required=True, help="Detector model export precision, e.g. fp32 or fp16")
     parser.add_argument("--config", required=True, help="Configuration name used for the runs/<config> directory")
     parser.add_argument("--rate", type=positive_float, default=1.0, help="MCAP playback rate multiplier (default: 1.0)")
@@ -243,11 +245,12 @@ def main() -> int:
             kitti_gt,
             eval_folder,
             seqmap_path,
-            args.thread_num,
+            args.n_threads,
             hardware,
             args.precision,
             args.config,
             args.rate,
+            [sequence.name for sequence in sequences],
         )
     except (OSError, ValueError, RuntimeError) as error:
         parser.error(f"could not prepare run metadata or TrackEval ground truth: {error}")
@@ -258,7 +261,7 @@ def main() -> int:
         command = launch_command(
             sequence.name,
             kitti_root,
-            args.thread_num,
+            args.n_threads,
             args.precision,
             args.config,
             args.rate,

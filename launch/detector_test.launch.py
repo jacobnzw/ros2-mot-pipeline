@@ -14,7 +14,7 @@ log_level = LaunchConfiguration("log_level")
 log_input_image = LaunchConfiguration("log_input_image")
 log_detections = LaunchConfiguration("log_detections")
 log_tracks = LaunchConfiguration("log_tracks")
-thread_num = LaunchConfiguration("thread_num")
+n_threads = LaunchConfiguration("n_threads")
 loop = LaunchConfiguration("loop")
 seq = LaunchConfiguration("seq")
 kitti_root = LaunchConfiguration("kitti_root")
@@ -96,7 +96,7 @@ def generate_launch_description():
                 extra_arguments=[{"use_intra_process_comms": True}],
             ),
         ]
-        thread_count = int(thread_num.perform(context))
+        thread_count = int(n_threads.perform(context))
         arguments = ["--ros-args", "--log-level", log_level.perform(context)]
         executable = "component_container"
         if thread_count > 1:
@@ -144,7 +144,7 @@ def generate_launch_description():
                 description="Whether to log tracker bounding boxes to Rerun.",
             ),
             DeclareLaunchArgument(
-                "thread_num",
+                "n_threads",
                 default_value="1",
                 description="Number of threads to use. If > 1 multi-threaded executor is used.",
             ),
