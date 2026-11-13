@@ -57,7 +57,7 @@ class RrdToCsvTests(unittest.TestCase):
                 precision="fp16",
                 rate=1.5,
                 sequence="0020",
-                label="baseline",
+                config="baseline",
                 now_ms=1_000_000,
             )
 
@@ -72,7 +72,7 @@ class RrdToCsvTests(unittest.TestCase):
             ],
         )
 
-    def test_csv_escapes_run_labels(self) -> None:
+    def test_csv_escapes_run_id_and_hardware(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output_path = Path(directory) / "latency.csv"
             write_csv(
@@ -89,7 +89,7 @@ class RrdToCsvTests(unittest.TestCase):
         self.assertEqual(rows[0][3], "Jetson, Orin")
         self.assertEqual(len(rows[0]), 9)
 
-    def test_additional_labels_default_to_empty_csv_columns(self) -> None:
+    def test_config_defaults_to_empty_csv_column(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output_path = Path(directory) / "latency.csv"
             write_csv(

@@ -159,7 +159,7 @@ def write_metadata(
     thread_num: int,
     hardware: str,
     precision: str,
-    label: str,
+    config: str,
     rate: float,
 ) -> None:
     metadata = {
@@ -167,8 +167,8 @@ def write_metadata(
         "hardware": hardware,
         "precision": precision,
         "rate": rate,
-        "label": label,
-        "label_dir": f"runs/{label}",
+        "config": config,
+        "config_dir": f"runs/{config}",
         "kitti_gt": f"{kitti_gt}",
         "kitti_root": f"{kitti_root}",
         "trackeval_gt": str(trackeval_gt.resolve()),  # TODO: can't we just save to kitti_gt instead? extra field?
@@ -184,7 +184,7 @@ def launch_command(
     kitti_root: Path,
     thread_num: int,
     precision: str,
-    label: str,
+    config: str,
     rate: float,
     loop: bool = False,
 ) -> list[str]:
@@ -194,7 +194,7 @@ def launch_command(
         "launch/detector_test.launch.py",
         f"thread_num:={thread_num}",
         f"seq:={sequence}",
-        f"label:={label}",
+        f"label:={config}",
         f"precision:={precision}",
         f"kitti_root:={kitti_root}",
         f"rate:={rate}",
@@ -210,7 +210,7 @@ def main() -> int:
     )
     parser.add_argument("--thread-num", type=positive_int, required=True, help="Detector container thread count")
     parser.add_argument("--precision", required=True, help="Detector model export precision, e.g. fp32 or fp16")
-    parser.add_argument("--label", required=True, help="Run label used for recording and metadata directories")
+    parser.add_argument("--config", required=True, help="Configuration name used for the runs/<config> directory")
     parser.add_argument("--rate", type=positive_float, default=1.0, help="MCAP playback rate multiplier (default: 1.0)")
     parser.add_argument("--loop", action="store_true", help="Loop MCAP playback indefinitely")
     parser.add_argument(
@@ -220,8 +220,8 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if not args.label or args.label in {".", ".."} or "/" in args.label or "\\" in args.label:
-        parser.error("--label must be a non-empty directory name without path separators")
+    if not args.config or args.config in {".", ".."} or "/" in args.config or "\\" in args.config:
+        parser.error("--config must be a non-empty directory name without path separators")
 
     kitti_root = args.kitti_root.expanduser().resolve()
     kitti_gt = args.kitti_gt.expanduser().resolve()
@@ -233,10 +233,10 @@ def main() -> int:
 
     repository_root = Path(__file__).resolve().parents[2]
     try:
-        run_dir = repository_root / "runs" / args.label
-        eval_folder = run_dir / "eval"
+        config_dir = repository_root / "runs" / args.config
+        eval_folder = config_dir / "eval"
         seqmap_path = create_trackeval_gt(eval_folder, kitti_gt, sequences)
-        metadata_path = run_dir / "metadata.yaml"
+        metadata_path = config_dir / "metadata.yaml"
         write_metadata(
             metadata_path,
             kitti_root,
@@ -246,7 +246,7 @@ def main() -> int:
             args.thread_num,
             hardware,
             args.precision,
-            args.label,
+            args.config,
             args.rate,
         )
     except (OSError, ValueError, RuntimeError) as error:
@@ -260,7 +260,7 @@ def main() -> int:
             kitti_root,
             args.thread_num,
             args.precision,
-            args.label,
+            args.config,
             args.rate,
             args.loop,
         )

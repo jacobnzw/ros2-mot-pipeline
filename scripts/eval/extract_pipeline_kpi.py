@@ -86,7 +86,7 @@ def write_csv(
     precision: str = "",
     rate: float = 1.0,
     sequence: str = "",
-    label: str = "",
+    config: str = "",
 ) -> None:
     if not samples:
         raise ValueError("recording contains no finite latency or duration scalar samples")
@@ -109,7 +109,7 @@ def write_csv(
                     precision,
                     rate,
                     sequence,
-                    label,
+                    config,
                     sample.value,
                 )
             )
@@ -130,11 +130,11 @@ def main() -> None:
         "--run-id",
         help="Run label (default: recording directory name, or recording filename stem)",
     )
-    parser.add_argument("--hw", default="", help="Hardware label")
-    parser.add_argument("--precision", default="", help="Precision label")
-    parser.add_argument("--rate", default="1.0", help="Rate label")
-    parser.add_argument("--seq", default="", help="Sequence label")
-    parser.add_argument("--label", default="", help="Additional user-defined label")
+    parser.add_argument("--hw", default="", help="Hardware value")
+    parser.add_argument("--precision", default="", help="Detector precision value")
+    parser.add_argument("--rate", default="1.0", help="Playback rate value")
+    parser.add_argument("--seq", default="", help="Sequence value")
+    parser.add_argument("--config", default="", help="Value for the VictoriaMetrics config metric label key")
     args = parser.parse_args()
 
     recording_path = args.recording.expanduser()
@@ -162,14 +162,14 @@ def main() -> None:
             precision=args.precision,
             rate=float(args.rate),
             sequence=args.seq,
-            label=args.label,
+            config=args.config,
         )
     except (OSError, RuntimeError, ValueError) as error:
         parser.error(str(error))
 
     print(f"Exported {len(samples):,} latency/duration samples to {output_path}")
     print(f"Run label: {run_id}")
-    print(f"Hardware: {args.hw}; precision: {args.precision}; sequence: {args.seq}; label: {args.label}")
+    print(f"Hardware: {args.hw}; precision: {args.precision}; sequence: {args.seq}; config: {args.config}")
 
 
 if __name__ == "__main__":
