@@ -1,7 +1,7 @@
 apiVersion: 1
 
 # When you open the dashboard, Grafana sends the panel queries to the data source URL. 
-# For example, the heatmap queries pipeline_kpi for the selected run and detector_inference stage.
+# For example, the heatmap queries pipeline_kpi for the selected config and detector_inference_ms stage.
 # That query is the VM-to-Grafana handoff—Grafana reads the results and draws the panels.
 datasources:
   - name: VictoriaMetrics

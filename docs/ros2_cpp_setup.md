@@ -190,7 +190,7 @@ values assigned to the metric label keys `hardware`, `precision`, `rate`, `confi
 `metric`. TrackEval timestamps use the newest detailed-results file modification time; score values are ratios in
 `[0, 1]`, while count metrics remain counts. The run label defaults to the recording directory name; pass an optional
 second argument to `analyse.sh` to override it. The stage label comes from the Rerun entity path (for example,
-`/detector/inference_latency_ms` becomes `detector_inference`). Counters and other non-duration scalars are omitted. You
+`/detector/inference_latency_ms` becomes `detector_inference_ms`). Counters and other non-duration scalars are omitted. You
 can also run
 `uv run scripts/eval/extract_pipeline_kpi.py runs/<run-id>/recording.rrd --hw jetson-orin --precision fp16 --seq 0020 --config baseline`
 to export the CSV without importing it.
@@ -208,8 +208,8 @@ latency-jitter histograms and side-by-side KPI charts. Automatic refresh is disa
 jitter is shown as the absolute deviation from the trailing 5-second mean. KPI charts use TrackEval's `COMBINED`
 sequence values, while pipeline detail panels can select an individual sequence or all sequences. The Prometheus data
 source uses a 100 ms minimum query interval to retain approximately the original 10 Hz sample resolution for the heatmap
-and histograms. Metrics already stored with the previous `job` label key are not renamed automatically; reimport their
-CSVs to make them available under `config`.
+and histograms. Metrics already stored with the previous `job` label key or unitless stage names are not renamed
+automatically; reexport and reimport their CSVs to use the `config` key and unit-suffixed stage names.
 
 VictoriaMetrics data and Grafana state persist in Docker named volumes across container restarts. VictoriaMetrics
 retains data for 31 days. Services bind to localhost only; Grafana's initial local credentials are `admin` / `admin`.

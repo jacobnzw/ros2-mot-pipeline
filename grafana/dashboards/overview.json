@@ -130,9 +130,9 @@
             "uid": "victoriametrics"
           },
           "editorMode": "code",
-          "expr": "pipeline_kpi{stage=\"detector_inference\",config=~\"$config\"}",
+          "expr": "pipeline_kpi{stage=\"detector_inference_ms\",config=~\"$config\"}",
           "interval": "100ms",
-          "legendFormat": "detector_inference",
+          "legendFormat": "detector_inference_ms",
           "range": true,
           "refId": "A"
         }
@@ -253,7 +253,7 @@
             "uid": "victoriametrics"
           },
           "editorMode": "code",
-          "expr": "pipeline_kpi{stage=\"detector_inference\",config=~\"$config\"}",
+          "expr": "pipeline_kpi{stage=\"detector_inference_ms\",config=~\"$config\"}",
           "interval": "100ms",
           "legendFormat": "detector",
           "range": true,
@@ -349,7 +349,7 @@
             "uid": "victoriametrics"
           },
           "editorMode": "code",
-          "expr": "pipeline_kpi{stage=\"tracker_association\",config=~\"$config\"}",
+          "expr": "pipeline_kpi{stage=\"tracker_association_ms\",config=~\"$config\"}",
           "interval": "100ms",
           "legendFormat": "association",
           "range": true,
@@ -445,7 +445,7 @@
             "uid": "victoriametrics"
           },
           "editorMode": "code",
-          "expr": "abs(pipeline_kpi{stage=\"detector_inference\",config=~\"$config\"} - avg_over_time(pipeline_kpi{stage=\"detector_inference\",config=~\"$config\"}[5s]))",
+          "expr": "abs(pipeline_kpi{stage=\"detector_inference_ms\",config=~\"$config\"} - avg_over_time(pipeline_kpi{stage=\"detector_inference_ms\",config=~\"$config\"}[5s]))",
           "interval": "100ms",
           "legendFormat": "detector",
           "range": true,
@@ -541,7 +541,7 @@
             "uid": "victoriametrics"
           },
           "editorMode": "code",
-          "expr": "abs(pipeline_kpi{stage=\"tracker_association\",config=~\"$config\"} - avg_over_time(pipeline_kpi{stage=\"tracker_association\",config=~\"$config\"}[5s]))",
+          "expr": "abs(pipeline_kpi{stage=\"tracker_association_ms\",config=~\"$config\"} - avg_over_time(pipeline_kpi{stage=\"tracker_association_ms\",config=~\"$config\"}[5s]))",
           "interval": "100ms",
           "legendFormat": "association",
           "range": true,
