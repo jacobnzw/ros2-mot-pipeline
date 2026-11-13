@@ -132,6 +132,7 @@ def sequence_output(recording_job: RecordingJob, run_metadata: RunMetadata) -> S
         run_id=recording_job.recording_path.parent.name,
         hardware=run_metadata.hardware,
         precision=run_metadata.precision,
+        rate=run_metadata.rate,
         sequence=recording_job.sequence,
         label=run_metadata.label,
     )
@@ -191,6 +192,7 @@ def tracker_kpi_csv(trackeval_results_folder: Path, run_metadata: RunMetadata) -
         timestamp_ms=timestamp_ms,
         hardware=run_metadata.hardware,
         precision=run_metadata.precision,
+        rate=run_metadata.rate,
         label=run_metadata.label,
     )
     return output_path

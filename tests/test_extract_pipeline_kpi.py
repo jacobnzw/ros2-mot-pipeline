@@ -55,6 +55,7 @@ class RrdToCsvTests(unittest.TestCase):
                 "run-001",
                 hardware="jetson",
                 precision="fp16",
+                rate=1.5,
                 sequence="0020",
                 label="baseline",
                 now_ms=1_000_000,
@@ -66,8 +67,8 @@ class RrdToCsvTests(unittest.TestCase):
         self.assertEqual(
             rows,
             [
-                ["999900", "run-001", "detector_inference", "jetson", "fp16", "0020", "baseline", "8.42"],
-                ["1000000", "run-001", "pipeline_end_to_end", "jetson", "fp16", "0020", "baseline", "24.61"],
+                ["999900", "run-001", "detector_inference", "jetson", "fp16", "1.5", "0020", "baseline", "8.42"],
+                ["1000000", "run-001", "pipeline_end_to_end", "jetson", "fp16", "1.5", "0020", "baseline", "24.61"],
             ],
         )
 
@@ -86,7 +87,7 @@ class RrdToCsvTests(unittest.TestCase):
 
         self.assertEqual(rows[0][1], "run,one")
         self.assertEqual(rows[0][3], "Jetson, Orin")
-        self.assertEqual(len(rows[0]), 8)
+        self.assertEqual(len(rows[0]), 9)
 
     def test_additional_labels_default_to_empty_csv_columns(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -101,7 +102,7 @@ class RrdToCsvTests(unittest.TestCase):
             with output_path.open(newline="", encoding="utf-8") as csv_file:
                 row = next(csv.reader(csv_file))
 
-        self.assertEqual(row, ["1000000", "run-001", "detector_inference", "", "", "", "", "1.0"])
+        self.assertEqual(row, ["1000000", "run-001", "detector_inference", "", "", "1.0", "", "", "1.0"])
 
 
 if __name__ == "__main__":

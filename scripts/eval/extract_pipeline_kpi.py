@@ -84,6 +84,7 @@ def write_csv(
     now_ms: int | None = None,
     hardware: str = "",
     precision: str = "",
+    rate: float = 1.0,
     sequence: str = "",
     label: str = "",
 ) -> None:
@@ -106,6 +107,7 @@ def write_csv(
                     sample.stage,
                     hardware,
                     precision,
+                    rate,
                     sequence,
                     label,
                     sample.value,
@@ -130,6 +132,7 @@ def main() -> None:
     )
     parser.add_argument("--hw", default="", help="Hardware label")
     parser.add_argument("--precision", default="", help="Precision label")
+    parser.add_argument("--rate", default="1.0", help="Rate label")
     parser.add_argument("--seq", default="", help="Sequence label")
     parser.add_argument("--label", default="", help="Additional user-defined label")
     args = parser.parse_args()
@@ -157,6 +160,7 @@ def main() -> None:
             run_id,
             hardware=args.hw,
             precision=args.precision,
+            rate=float(args.rate),
             sequence=args.seq,
             label=args.label,
         )

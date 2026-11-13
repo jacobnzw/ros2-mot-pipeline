@@ -107,6 +107,7 @@ def write_kpi_csv(
     timestamp_ms: int,
     hardware: str = "",
     precision: str = "",
+    rate: float = 1.0,
     label: str = "",
 ) -> None:
     if not samples:
@@ -120,6 +121,7 @@ def write_kpi_csv(
                     timestamp_ms,
                     hardware,
                     precision,
+                    rate,
                     label,
                     sample.tracker,
                     sample.sequence,
