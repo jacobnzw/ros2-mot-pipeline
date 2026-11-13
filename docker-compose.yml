@@ -10,6 +10,9 @@ services:
       - victoria-metrics-data:/victoria-metrics-data  # See docker volume ls, docker volume inspect <volume_name>
     restart: unless-stopped
 
+  renderer:
+    image: grafana/grafana-image-renderer:latest
+  
   grafana:
     image: grafana/grafana:12.0.0
     depends_on:
@@ -25,6 +28,8 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_RENDERING_SERVER_URL: http://renderer:8081/render
+      GF_RENDERING_CALLBACK_URL: http://grafana:3000/
     restart: unless-stopped
 
 volumes:
