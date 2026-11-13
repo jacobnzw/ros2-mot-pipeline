@@ -19,8 +19,8 @@ from scripts.eval import extract_pipeline_kpi, extract_tracker_preds_to_kitti, r
 
 @dataclass(frozen=True)
 class RunMetadata:
-    label: str
-    label_dir: Path
+    config: str
+    config_dir: Path
     hardware: str
     precision: str
     rate: float
@@ -75,10 +75,12 @@ def run_metadata(metadata_path: Path) -> RunMetadata:
     if not isinstance(metadata, dict):
         raise ValueError(f"run metadata must contain a YAML mapping: {metadata_path}")
 
-    label = _required_string(metadata, "label")
-    label_dir = _resolve_metadata_path(_required_string(metadata, "label_dir"), metadata_path)
-    if not label_dir.is_dir():
-        raise ValueError(f"run label directory does not exist: {label_dir}")
+    config_key = "config" if "config" in metadata else "label"
+    config = _required_string(metadata, config_key)
+    config_dir_key = "config_dir" if "config_dir" in metadata else "label_dir"
+    config_dir = _resolve_metadata_path(_required_string(metadata, config_dir_key), metadata_path)
+    if not config_dir.is_dir():
+        raise ValueError(f"run config directory does not exist: {config_dir}")
 
     hardware = _required_string(metadata, "hardware")
     precision = _required_string(metadata, "precision")
@@ -93,8 +95,8 @@ def run_metadata(metadata_path: Path) -> RunMetadata:
         raise ValueError(f"TrackEval seqmap must be inside the TrackEval ground-truth folder: {trackeval_seqmap}")
 
     return RunMetadata(
-        label=label,
-        label_dir=label_dir,
+        config=config,
+        config_dir=config_dir,
         hardware=hardware,
         precision=precision,
         rate=rate,
@@ -103,9 +105,9 @@ def run_metadata(metadata_path: Path) -> RunMetadata:
 
 
 def recording_job(run_metadata: RunMetadata) -> htypes.Parallelizable[RecordingJob]:
-    recordings = sorted(run_metadata.label_dir.glob("*/recording.rrd"))
+    recordings = sorted(run_metadata.config_dir.glob("*/recording.rrd"))
     if not recordings:
-        raise ValueError(f"no recording.rrd files found directly under {run_metadata.label_dir}")
+        raise ValueError(f"no recording.rrd files found directly under {run_metadata.config_dir}")
 
     jobs = []
     for recording_path in recordings:
@@ -123,7 +125,7 @@ def recording_job(run_metadata: RunMetadata) -> htypes.Parallelizable[RecordingJ
 
 
 def sequence_output(recording_job: RecordingJob, run_metadata: RunMetadata) -> SequenceOutput:
-    pipeline_output_path = run_metadata.label_dir / "eval" / "pipeline" / f"kpi_{recording_job.sequence}.csv"
+    pipeline_output_path = run_metadata.config_dir / "eval" / "pipeline" / f"kpi_{recording_job.sequence}.csv"
     pipeline_output_path.parent.mkdir(parents=True, exist_ok=True)
     samples = extract_pipeline_kpi.read_latency_samples(recording_job.recording_path)
     extract_pipeline_kpi.write_csv(
@@ -134,11 +136,11 @@ def sequence_output(recording_job: RecordingJob, run_metadata: RunMetadata) -> S
         precision=run_metadata.precision,
         rate=run_metadata.rate,
         sequence=recording_job.sequence,
-        label=run_metadata.label,
+        config=run_metadata.config,
     )
 
     tracker_output_path = (
-        run_metadata.label_dir / "eval" / "trackers" / "bytetrack" / "data" / f"{recording_job.sequence}.txt"
+        run_metadata.config_dir / "eval" / "trackers" / "bytetrack" / "data" / f"{recording_job.sequence}.txt"
     )
     tracker_output_path.parent.mkdir(parents=True, exist_ok=True)
     tracks = extract_tracker_preds_to_kitti.read_tracks(
@@ -168,8 +170,8 @@ def tracker_prediction_files(sequence_outputs: list[SequenceOutput]) -> list[Pat
 
 
 def trackeval_results_folder(tracker_prediction_files: list[Path], run_metadata: RunMetadata) -> Path:
-    tracker_folder = run_metadata.label_dir / "eval" / "trackers" / "bytetrack"
-    output_folder = run_metadata.label_dir / "eval" / "trackers"
+    tracker_folder = run_metadata.config_dir / "eval" / "trackers" / "bytetrack"
+    output_folder = run_metadata.config_dir / "eval" / "trackers"
     run_trackeval.run_trackeval(
         sequences=sorted(path.stem for path in tracker_prediction_files),
         gt_folder=run_metadata.trackeval_gt,
@@ -184,7 +186,7 @@ def trackeval_results_folder(tracker_prediction_files: list[Path], run_metadata:
 def tracker_kpi_csv(trackeval_results_folder: Path, run_metadata: RunMetadata) -> Path:
     samples, detailed_files = trackeval_to_vm.read_trackeval_samples(trackeval_results_folder)
     timestamp_ms = max(path.stat().st_mtime_ns for path in detailed_files) // 1_000_000
-    output_path = run_metadata.label_dir / "eval" / "tracker_kpi.csv"
+    output_path = run_metadata.config_dir / "eval" / "tracker_kpi.csv"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     trackeval_to_vm.write_kpi_csv(
         samples,
@@ -193,7 +195,7 @@ def tracker_kpi_csv(trackeval_results_folder: Path, run_metadata: RunMetadata) -
         hardware=run_metadata.hardware,
         precision=run_metadata.precision,
         rate=run_metadata.rate,
-        label=run_metadata.label,
+        config=run_metadata.config,
     )
     return output_path
 
@@ -225,7 +227,9 @@ def _main() -> int:
     )
     metadata_group = parser.add_mutually_exclusive_group(required=True)
     metadata_group.add_argument("--metadata", type=Path, help="Path to the run metadata YAML")
-    metadata_group.add_argument("--label", help="Run label; loads runs/<label>/metadata.yaml from the repository root")
+    metadata_group.add_argument(
+        "--config", help="Configuration name; loads runs/<config>/metadata.yaml from the repository root"
+    )
     parser.add_argument(
         "--max-workers",
         type=_positive_int,
@@ -234,10 +238,10 @@ def _main() -> int:
     )
     args = parser.parse_args()
 
-    if args.label is not None:
-        if not args.label or args.label in {".", ".."} or "/" in args.label or "\\" in args.label:
-            parser.error("--label must be a non-empty directory name without path separators")
-        metadata_path = Path(__file__).resolve().parents[2] / "runs" / args.label / "metadata.yaml"
+    if args.config is not None:
+        if not args.config or args.config in {".", ".."} or "/" in args.config or "\\" in args.config:
+            parser.error("--config must be a non-empty directory name without path separators")
+        metadata_path = Path(__file__).resolve().parents[2] / "runs" / args.config / "metadata.yaml"
     else:
         metadata_path = args.metadata
 

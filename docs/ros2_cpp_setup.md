@@ -143,17 +143,16 @@ To run every sequence directory in an MCAP root sequentially, use the batch runn
 
 ```bash
 uv run scripts/eval/run_kitti_sequences.py \
-  --thread-num 1 --precision fp16 --label baseline --rate 1.5
+  --thread-num 1 --precision fp16 --config baseline --rate 1.5
 ```
 
 `--kitti-root` defaults to `data/kitti/left_color/training/image_02_mcap`; each sequence folder must contain
 `<sequence>/<sequence>.mcap`. Optionally pass `--seq 0019,0020` to run only the listed sequences. The batch runner
-detects Jetson or RTX 3090 hardware, writes `runs/<label>/metadata.yaml` with the run configuration, and stops if a
-sequence launch fails. `--rate` sets the MCAP playback speed and defaults to `1.0`. Pass `--loop` to loop playback
-indefinitely; in that mode, the runner will not proceed to the next sequence. The `precision` launch argument is
-selects `models/yolo/yolo11n_<precision>.onnx` (for example, `precision:=FP32` selects
-`models/yolo/yolo11n_fp32.onnx`). Precision values may be lowercase or uppercase, and the selected model file must
-exist.
+detects Jetson or RTX 3090 hardware, writes `runs/<config>/metadata.yaml` with the configuration and stops if a sequence
+launch fails. `--rate` sets the MCAP playback speed and defaults to `1.0`. Pass `--loop` to loop playback indefinitely;
+in that mode, the runner will not proceed to the next sequence. The `precision` launch argument selects
+`models/yolo/yolo11n_<precision>.onnx` (for example, `precision:=FP32` selects `models/yolo/yolo11n_fp32.onnx`).
+Precision values may be lowercase or uppercase, and the selected model file must exist.
 
 The C++ SDK fetched by CMake writes Rerun data, but does not install the standalone Rerun viewer/CLI. Install the viewer
 separately, for example with `uv tool install rerun-sdk` (see the
@@ -177,37 +176,40 @@ To export latency, duration, and callback-interval scalar samples to VictoriaMet
 
 ```bash
 scripts/analyse.sh runs/<run-id>/recording.rrd \
-  --hw jetson-orin --quant fp16 --seq 0020 --label baseline
+  --hw jetson-orin --precision fp16 --seq 0020 --config baseline
 ```
 
 The script writes `latency.csv` beside the recording and, if TrackEval detailed results are present under the same run
 folder, writes `trackeval.csv` there too. It starts the Compose services, waits for them to respond, and imports both
-CSVs into VictoriaMetrics. Latency rows have columns `timestamp_ms,run,stage,hardware,precision,sequence,label,value`
-and become `pipeline_kpi` samples. The `--hw`, `--precision`, `--seq`, and `--label` options populate the corresponding
-metadata labels; they default to empty strings. TrackEval rows have columns
-`timestamp_ms,run,hardware,precision,label,tracker,sequence,class,metric,value` and become `mot_kpi` samples with
-run/hardware/precision/label/tracker/sequence/class/metric labels. TrackEval timestamps use the newest detailed-results
-file modification time; score values are ratios in `[0, 1]`, while count metrics remain counts. The run label defaults
-to the recording directory name; pass an optional second argument to `analyse.sh` to override it. The stage label comes
-from the Rerun entity path (for example, `/detector/inference_latency_ms` becomes `detector_inference`). Counters and
-other non-duration scalars are omitted. You can also run
-`uv run scripts/eval/extract_pipeline_kpi.py runs/<run-id>/recording.rrd --hw jetson-orin --precision fp16 --seq 0020 --label baseline`
-to export only the CSV with those labels.
+CSVs into VictoriaMetrics. Latency rows have columns
+`timestamp_ms,run,stage,hardware,precision,rate,sequence,config,value` and become `pipeline_kpi` samples. The `--hw`,
+`--precision`, `--rate`, `--seq`, and `--config` options supply values for the corresponding metric label keys; values
+default to empty strings, except `--rate` which defaults to `1.0`. TrackEval rows have columns
+`timestamp_ms,hardware,precision,rate,config,tracker,sequence,class,metric,value` and become `mot_kpi` samples with
+values assigned to the metric label keys `hardware`, `precision`, `rate`, `config`, `tracker`, `sequence`, `class`, and
+`metric`. TrackEval timestamps use the newest detailed-results file modification time; score values are ratios in
+`[0, 1]`, while count metrics remain counts. The run label defaults to the recording directory name; pass an optional
+second argument to `analyse.sh` to override it. The stage label comes from the Rerun entity path (for example,
+`/detector/inference_latency_ms` becomes `detector_inference`). Counters and other non-duration scalars are omitted. You
+can also run
+`uv run scripts/eval/extract_pipeline_kpi.py runs/<run-id>/recording.rrd --hw jetson-orin --precision fp16 --seq 0020 --config baseline`
+to export the CSV without importing it.
 
 The exporter uses `steady_elapsed` when present, falling back to `ros2_timestamp` for older recordings. It maps elapsed
 time so the final sample is at export time, preserving the spacing between samples and making the recording visible in
 Grafana's current time range.
 
 The Compose stack uses VictoriaMetrics v1.155.0 and Grafana 12.0.0. The VictoriaMetrics image is pulled on first
-startup. Three provisioned dashboards are available: `Overview` shows pooled detector-inference mean/p50/p95
-statistics, latency and latency-jitter histograms, and TrackEval `COMBINED` KPIs for the selected label;
-`Pipeline details` provides a detector-latency heatmap, rolling 5-second
-p50/p95/p99, callback-duration histograms, and inter-callback-interval histograms by label and sequence; and
-`A/B Overview` compares two labels with overlaid latency-jitter histograms and side-by-side KPI charts. Automatic
-refresh is disabled on all three dashboards. Latency jitter is shown as the absolute deviation from the trailing
-5-second mean. KPI charts use TrackEval's `COMBINED` sequence values, while pipeline detail panels can select an
-individual sequence or all sequences. The Prometheus data source uses a 100 ms minimum query interval to retain
-approximately the original 10 Hz sample resolution for the heatmap and histograms.
+startup. Three provisioned dashboards are available: `Overview` shows pooled detector-inference mean/p50/p95 statistics,
+latency and latency-jitter histograms, and TrackEval `COMBINED` KPIs for the selected config; `Pipeline details`
+provides a detector-latency heatmap, rolling 5-second p50/p95/p99, callback-duration histograms, and
+inter-callback-interval histograms by config and sequence; and `A/B Overview` compares two configs with overlaid
+latency-jitter histograms and side-by-side KPI charts. Automatic refresh is disabled on all three dashboards. Latency
+jitter is shown as the absolute deviation from the trailing 5-second mean. KPI charts use TrackEval's `COMBINED`
+sequence values, while pipeline detail panels can select an individual sequence or all sequences. The Prometheus data
+source uses a 100 ms minimum query interval to retain approximately the original 10 Hz sample resolution for the heatmap
+and histograms. Metrics already stored with the previous `job` label key are not renamed automatically; reimport their
+CSVs to make them available under `config`.
 
 VictoriaMetrics data and Grafana state persist in Docker named volumes across container restarts. VictoriaMetrics
 retains data for 31 days. Services bind to localhost only; Grafana's initial local credentials are `admin` / `admin`.

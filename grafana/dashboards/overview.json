@@ -39,7 +39,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Mean, p50, and p95 detector inference latency calculated from samples across all sequences matching the selected label and dashboard time range.",
+      "description": "Mean, p50, and p95 detector inference latency calculated from samples across all sequences matching the selected config and dashboard time range.",
       "fieldConfig": {
         "defaults": {
           "decimals": 2,
@@ -130,7 +130,7 @@
             "uid": "victoriametrics"
           },
           "editorMode": "code",
-          "expr": "pipeline_kpi{stage=\"detector_inference\",label=~\"$label\"}",
+          "expr": "pipeline_kpi{stage=\"detector_inference\",config=~\"$config\"}",
           "interval": "100ms",
           "legendFormat": "detector_inference",
           "range": true,
@@ -172,7 +172,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distribution of detector inference latency samples for the selected label, combined across sequences.",
+      "description": "Distribution of detector inference latency samples for the selected config, combined across sequences.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -253,7 +253,7 @@
             "uid": "victoriametrics"
           },
           "editorMode": "code",
-          "expr": "pipeline_kpi{stage=\"detector_inference\",label=~\"$label\"}",
+          "expr": "pipeline_kpi{stage=\"detector_inference\",config=~\"$config\"}",
           "interval": "100ms",
           "legendFormat": "detector",
           "range": true,
@@ -268,7 +268,7 @@
         "type": "prometheus",
         "uid": "victoriametrics"
       },
-      "description": "Distribution of tracker association latency samples for the selected label, combined across sequences.",
+      "description": "Distribution of tracker association latency samples for the selected config, combined across sequences.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -349,7 +349,7 @@
             "uid": "victoriametrics"
           },
           "editorMode": "code",
-          "expr": "pipeline_kpi{stage=\"tracker_association\",label=~\"$label\"}",
+          "expr": "pipeline_kpi{stage=\"tracker_association\",config=~\"$config\"}",
           "interval": "100ms",
           "legendFormat": "association",
           "range": true,
@@ -445,7 +445,7 @@
             "uid": "victoriametrics"
           },
           "editorMode": "code",
-          "expr": "abs(pipeline_kpi{stage=\"detector_inference\",label=~\"$label\"} - avg_over_time(pipeline_kpi{stage=\"detector_inference\",label=~\"$label\"}[5s]))",
+          "expr": "abs(pipeline_kpi{stage=\"detector_inference\",config=~\"$config\"} - avg_over_time(pipeline_kpi{stage=\"detector_inference\",config=~\"$config\"}[5s]))",
           "interval": "100ms",
           "legendFormat": "detector",
           "range": true,
@@ -541,7 +541,7 @@
             "uid": "victoriametrics"
           },
           "editorMode": "code",
-          "expr": "abs(pipeline_kpi{stage=\"tracker_association\",label=~\"$label\"} - avg_over_time(pipeline_kpi{stage=\"tracker_association\",label=~\"$label\"}[5s]))",
+          "expr": "abs(pipeline_kpi{stage=\"tracker_association\",config=~\"$config\"} - avg_over_time(pipeline_kpi{stage=\"tracker_association\",config=~\"$config\"}[5s]))",
           "interval": "100ms",
           "legendFormat": "association",
           "range": true,
@@ -648,7 +648,7 @@
                 "uid": "victoriametrics"
               },
               "editorMode": "code",
-              "expr": "avg by (metric, class) (last_over_time(mot_kpi{label=~\"$label\",sequence=\"COMBINED\",metric=~\"HOTA|IDF1|MOTP\"}[31d]))",
+              "expr": "avg by (metric, class) (last_over_time(mot_kpi{config=~\"$config\",sequence=\"COMBINED\",metric=~\"HOTA|IDF1|MOTP\"}[31d]))",
               "format": "table",
               "instant": true,
               "legendFormat": "{{class}}",
@@ -766,7 +766,7 @@
                 "uid": "victoriametrics"
               },
               "editorMode": "code",
-              "expr": "avg by (metric, class) (last_over_time(mot_kpi{label=~\"$label\",sequence=\"COMBINED\",metric=~\"IDSW|Frag\"}[31d]))",
+              "expr": "avg by (metric, class) (last_over_time(mot_kpi{config=~\"$config\",sequence=\"COMBINED\",metric=~\"IDSW|Frag\"}[31d]))",
               "format": "table",
               "instant": true,
               "legendFormat": "{{class}}",
@@ -820,12 +820,12 @@
           "type": "prometheus",
           "uid": "victoriametrics"
         },
-        "definition": "label_values({__name__=~\"pipeline_kpi|mot_kpi\",label!=\"\"}, label)",
+        "definition": "label_values({__name__=~\"pipeline_kpi|mot_kpi\",config!=\"\"}, config)",
         "includeAll": false,
-        "label": "Label",
-        "name": "label",
+        "label": "Config",
+        "name": "config",
         "options": [],
-        "query": "label_values({__name__=~\"pipeline_kpi|mot_kpi\",label!=\"\"}, label)",
+        "query": "label_values({__name__=~\"pipeline_kpi|mot_kpi\",config!=\"\"}, config)",
         "refresh": 2,
         "type": "query"
       }

@@ -104,8 +104,8 @@ class RunKittiSequencesTests(unittest.TestCase):
                     "hardware": "rtx3090",
                     "precision": "fp16",
                     "rate": 1.5,
-                    "label": "nightly-run",
-                    "label_dir": "runs/nightly-run",
+                    "config": "nightly-run",
+                    "config_dir": "runs/nightly-run",
                     "kitti_gt": str(kitti_gt),
                     "kitti_root": str(kitti_root),
                     "trackeval_gt": str(trackeval_gt.resolve()),
@@ -152,7 +152,7 @@ class RunKittiSequencesTests(unittest.TestCase):
             )
 
             self.assertEqual(
-                yaml.safe_load(metadata.read_text(encoding="utf-8"))["label"],
+                yaml.safe_load(metadata.read_text(encoding="utf-8"))["config"],
                 'baseline: "nightly"',
             )
 

@@ -108,7 +108,7 @@ def write_kpi_csv(
     hardware: str = "",
     precision: str = "",
     rate: float = 1.0,
-    label: str = "",
+    config: str = "",
 ) -> None:
     if not samples:
         raise ValueError("TrackEval results contain no KPI samples")
@@ -122,7 +122,7 @@ def write_kpi_csv(
                     hardware,
                     precision,
                     rate,
-                    label,
+                    config,
                     sample.tracker,
                     sample.sequence,
                     sample.class_name,
@@ -154,9 +154,9 @@ def main() -> None:
         type=int,
         help="Evaluation timestamp in Unix milliseconds (default: newest detailed file modification time)",
     )
-    parser.add_argument("--hw", default="", help="Hardware label")
-    parser.add_argument("--precision", default="", help="Precision label")
-    parser.add_argument("--label", default="", help="Additional user-defined label")
+    parser.add_argument("--hw", default="", help="Hardware value")
+    parser.add_argument("--precision", default="", help="Detector precision value")
+    parser.add_argument("--config", default="", help="Value for the VictoriaMetrics config metric label key")
     args = parser.parse_args()
 
     results_folder = args.results_folder.expanduser()
@@ -182,14 +182,14 @@ def main() -> None:
             timestamp_ms,
             hardware=args.hw,
             precision=args.precision,
-            label=args.label,
+            config=args.config,
         )
     except (OSError, RuntimeError, ValueError) as error:
         parser.error(str(error))
 
     print(f"Exported {len(samples):,} TrackEval KPI samples to {output_path}")
     print(f"Run label: {run_id}")
-    print(f"Hardware: {args.hw}; precision: {args.precision}; label: {args.label}")
+    print(f"Hardware: {args.hw}; precision: {args.precision}; config: {args.config}")
     print(f"Evaluation timestamp: {timestamp_ms} ms since Unix epoch")
 
 

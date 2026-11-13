@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: $0 <label>" >&2
+  echo "Usage: $0 <config>" >&2
 }
 
 if [[ $# -ne 1 ]]; then
@@ -10,9 +10,9 @@ if [[ $# -ne 1 ]]; then
   exit 2
 fi
 
-label=$1
-if [[ -z $label || $label == "." || $label == ".." || $label == */* || $label == *\\* ]]; then
-  echo "Error: label must be a non-empty directory name without path separators" >&2
+config=$1
+if [[ -z $config || $config == "." || $config == ".." || $config == */* || $config == *\\* ]]; then
+  echo "Error: config must be a non-empty directory name without path separators" >&2
   exit 2
 fi
 
@@ -29,16 +29,16 @@ fi
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 repo_root=$(cd -- "$script_dir/../.." && pwd)
-run_dir="$repo_root/runs/$label"
-pipeline_dir="$run_dir/eval/pipeline"
-tracker_kpi_csv="$run_dir/eval/tracker_kpi.csv"
+config_dir="$repo_root/runs/$config"
+pipeline_dir="$config_dir/eval/pipeline"
+tracker_kpi_csv="$config_dir/eval/tracker_kpi.csv"
 
 shopt -s nullglob
 pipeline_csvs=("$pipeline_dir"/kpi_*.csv)
 shopt -u nullglob
 
-if [[ ! -d $run_dir ]]; then
-  echo "Error: run directory does not exist: $run_dir" >&2
+if [[ ! -d $config_dir ]]; then
+  echo "Error: config directory does not exist: $config_dir" >&2
   exit 1
 fi
 if [[ ${#pipeline_csvs[@]} -eq 0 ]]; then
@@ -86,14 +86,14 @@ import_csv() {
   echo
 }
 
-pipeline_format="1:time:unix_ms,2:label:run,3:label:stage,4:label:hardware,5:label:precision,6:label:sequence,7:label:label,8:metric:pipeline_kpi"
-tracker_format="1:time:unix_ms,2:label:hardware,3:label:precision,4:label:label,5:label:tracker,6:label:sequence,7:label:class,8:label:metric,9:metric:mot_kpi"
+pipeline_format="1:time:unix_ms,2:label:run,3:label:stage,4:label:hardware,5:label:precision,6:label:rate,7:label:sequence,8:label:config,9:metric:pipeline_kpi"
+tracker_format="1:time:unix_ms,2:label:hardware,3:label:precision,4:label:rate,5:label:config,6:label:tracker,7:label:sequence,8:label:class,9:label:metric,10:metric:mot_kpi"
 
 for csv_path in "${pipeline_csvs[@]}"; do
   import_csv "$csv_path" "$pipeline_format"
 done
 import_csv "$tracker_kpi_csv" "$tracker_format"
 
-echo "Done importing run '$label'."
+echo "Done importing config '$config'."
 echo "Grafana: http://127.0.0.1:3000"
 echo "VictoriaMetrics: http://127.0.0.1:8428/vmui"
