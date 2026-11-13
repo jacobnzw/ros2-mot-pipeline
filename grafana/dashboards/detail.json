@@ -28,7 +28,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "pipeline_kpi{stage=\"detector_inference_ms\",config=~\"$config\",sequence=~\"$sequence\"}",
+          "expr": "pipeline_kpi{name=\"detector_inference_ms\",config=~\"$config\",sequence=~\"$sequence\"}",
           "interval": "100ms",
           "legendFormat": "{{sequence}}",
           "range": true,
@@ -53,7 +53,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "quantile_over_time(0.50, pipeline_kpi{stage=\"detector_inference_ms\",config=~\"$config\",sequence=~\"$sequence\"}[5s])",
+          "expr": "quantile_over_time(0.50, pipeline_kpi{name=\"detector_inference_ms\",config=~\"$config\",sequence=~\"$sequence\"}[5s])",
           "interval": "100ms",
           "legendFormat": "p50",
           "range": true,
@@ -62,7 +62,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "quantile_over_time(0.95, pipeline_kpi{stage=\"detector_inference_ms\",config=~\"$config\",sequence=~\"$sequence\"}[5s])",
+          "expr": "quantile_over_time(0.95, pipeline_kpi{name=\"detector_inference_ms\",config=~\"$config\",sequence=~\"$sequence\"}[5s])",
           "interval": "100ms",
           "legendFormat": "p95",
           "range": true,
@@ -71,7 +71,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "quantile_over_time(0.99, pipeline_kpi{stage=\"detector_inference_ms\",config=~\"$config\",sequence=~\"$sequence\"}[5s])",
+          "expr": "quantile_over_time(0.99, pipeline_kpi{name=\"detector_inference_ms\",config=~\"$config\",sequence=~\"$sequence\"}[5s])",
           "interval": "100ms",
           "legendFormat": "p99",
           "range": true,
@@ -93,7 +93,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "pipeline_kpi{stage=\"detector_callback_duration_ms\",config=~\"$config\",sequence=~\"$sequence\"}",
+          "expr": "pipeline_kpi{name=\"detector_callback_duration_ms\",config=~\"$config\",sequence=~\"$sequence\"}",
           "interval": "100ms",
           "legendFormat": "detector",
           "range": true,
@@ -115,7 +115,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "pipeline_kpi{stage=\"tracker_callback_duration_ms\",config=~\"$config\",sequence=~\"$sequence\"}",
+          "expr": "pipeline_kpi{name=\"tracker_callback_duration_ms\",config=~\"$config\",sequence=~\"$sequence\"}",
           "interval": "100ms",
           "legendFormat": "tracker",
           "range": true,
@@ -137,7 +137,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "pipeline_kpi{stage=\"detector_callback_interval_ms\",config=~\"$config\",sequence=~\"$sequence\"}",
+          "expr": "pipeline_kpi{name=\"detector_callback_interval_ms\",config=~\"$config\",sequence=~\"$sequence\"}",
           "interval": "100ms",
           "legendFormat": "detector",
           "range": true,
@@ -159,7 +159,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "victoriametrics"},
           "editorMode": "code",
-          "expr": "pipeline_kpi{stage=\"tracker_callback_interval_ms\",config=~\"$config\",sequence=~\"$sequence\"}",
+          "expr": "pipeline_kpi{name=\"tracker_callback_interval_ms\",config=~\"$config\",sequence=~\"$sequence\"}",
           "interval": "100ms",
           "legendFormat": "tracker",
           "range": true,

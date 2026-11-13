@@ -107,6 +107,7 @@ def write_kpi_csv(
     timestamp_ms: int,
     hardware: str = "",
     precision: str = "",
+    n_threads: int | None = None,
     rate: float = 1.0,
     config: str = "",
 ) -> None:
@@ -121,6 +122,7 @@ def write_kpi_csv(
                     timestamp_ms,
                     hardware,
                     precision,
+                    "" if n_threads is None else n_threads,
                     rate,
                     config,
                     sample.tracker,
@@ -156,8 +158,11 @@ def main() -> None:
     )
     parser.add_argument("--hw", default="", help="Hardware value")
     parser.add_argument("--precision", default="", help="Detector precision value")
+    parser.add_argument("--n-threads", type=int, help="Number of detector container threads")
     parser.add_argument("--config", default="", help="Value for the VictoriaMetrics config metric label key")
     args = parser.parse_args()
+    if args.n_threads is not None and args.n_threads < 1:
+        parser.error("--n-threads must be greater than zero")
 
     results_folder = args.results_folder.expanduser()
     if not results_folder.is_dir():
@@ -182,6 +187,7 @@ def main() -> None:
             timestamp_ms,
             hardware=args.hw,
             precision=args.precision,
+            n_threads=args.n_threads,
             config=args.config,
         )
     except (OSError, RuntimeError, ValueError) as error:

@@ -21,6 +21,7 @@ from scripts.eval import extract_pipeline_kpi, extract_tracker_preds_to_kitti, r
 class RunMetadata:
     config: str
     config_dir: Path
+    n_threads: int
     hardware: str
     precision: str
     rate: float
@@ -65,6 +66,13 @@ def _metadata_rate(metadata: dict[str, Any]) -> float:
     return float(value)
 
 
+def _metadata_n_threads(metadata: dict[str, Any]) -> int:
+    value = metadata.get("n_threads", metadata.get("thread_num"))
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError("metadata field 'n_threads' must be an integer greater than zero")
+    return value
+
+
 def run_metadata(metadata_path: Path) -> RunMetadata:
     metadata_path = metadata_path.expanduser().resolve()
     if not metadata_path.is_file():
@@ -85,6 +93,7 @@ def run_metadata(metadata_path: Path) -> RunMetadata:
     hardware = _required_string(metadata, "hardware")
     precision = _required_string(metadata, "precision")
     rate = _metadata_rate(metadata)
+    n_threads = _metadata_n_threads(metadata)
     trackeval_gt = _resolve_metadata_path(_required_string(metadata, "trackeval_gt"), metadata_path)
     if not (trackeval_gt / "label_02").is_dir():
         raise ValueError(f"TrackEval ground-truth folder must contain label_02/: {trackeval_gt}")
@@ -97,6 +106,7 @@ def run_metadata(metadata_path: Path) -> RunMetadata:
     return RunMetadata(
         config=config,
         config_dir=config_dir,
+        n_threads=n_threads,
         hardware=hardware,
         precision=precision,
         rate=rate,
@@ -134,6 +144,7 @@ def sequence_output(recording_job: RecordingJob, run_metadata: RunMetadata) -> S
         run_id=recording_job.recording_path.parent.name,
         hardware=run_metadata.hardware,
         precision=run_metadata.precision,
+        n_threads=run_metadata.n_threads,
         rate=run_metadata.rate,
         sequence=recording_job.sequence,
         config=run_metadata.config,
@@ -194,6 +205,7 @@ def tracker_kpi_csv(trackeval_results_folder: Path, run_metadata: RunMetadata) -
         timestamp_ms=timestamp_ms,
         hardware=run_metadata.hardware,
         precision=run_metadata.precision,
+        n_threads=run_metadata.n_threads,
         rate=run_metadata.rate,
         config=run_metadata.config,
     )

@@ -95,15 +95,17 @@ class RunKittiSequencesTests(unittest.TestCase):
                 "fp16",
                 "nightly-run",
                 1.5,
+                ["0020", "0001"],
             )
 
             self.assertEqual(
                 yaml.safe_load(metadata.read_text(encoding="utf-8")),
                 {
-                    "thread_num": 4,
+                    "n_threads": 4,
                     "hardware": "rtx3090",
                     "precision": "fp16",
                     "rate": 1.5,
+                    "sequences": ["0020", "0001"],
                     "config": "nightly-run",
                     "config_dir": "runs/nightly-run",
                     "kitti_gt": str(kitti_gt),
@@ -120,7 +122,7 @@ class RunKittiSequencesTests(unittest.TestCase):
                 "ros2",
                 "launch",
                 "launch/detector_test.launch.py",
-                "thread_num:=4",
+                "n_threads:=4",
                 "seq:=0019",
                 "label:=nightly",
                 "precision:=fp16",
@@ -149,6 +151,7 @@ class RunKittiSequencesTests(unittest.TestCase):
                 "fp16",
                 'baseline: "nightly"',
                 1.0,
+                ["0019"],
             )
 
             self.assertEqual(
