@@ -26,10 +26,9 @@ class Sample:
 def stage_from_entity_path(entity_path: str) -> str | None:
     stage = entity_path.strip("/").replace("/", "_")
     if stage.endswith("_latency_ms"):
-        return stage[: -len("_latency_ms")]
-    for suffix in ("_duration_ms", "_interval_ms"):
-        if stage.endswith(suffix):
-            return stage[: -len("_ms")]
+        return stage[: -len("_latency_ms")] + "_ms"
+    if stage.endswith(("_duration_ms", "_interval_ms")):
+        return stage
     return None
 
 

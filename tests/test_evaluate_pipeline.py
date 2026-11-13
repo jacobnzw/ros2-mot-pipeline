@@ -137,7 +137,7 @@ class EvaluatePipelineTests(unittest.TestCase):
                         readers_started_together.set()
                 if not readers_started_together.wait(timeout=5):
                     raise AssertionError("per-sequence work was not run concurrently")
-                return [Sample(1_000_000_000, "detector_inference", 1.0)]
+                return [Sample(1_000_000_000, "detector_inference_ms", 1.0)]
 
             def read_predictions(recording_path: Path, fps: float, first_frame_timestamp_ns: int) -> list:
                 return []

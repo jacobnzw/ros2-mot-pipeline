@@ -15,10 +15,14 @@ from scripts.eval.extract_pipeline_kpi import (
 
 
 class RrdToCsvTests(unittest.TestCase):
-    def test_stage_from_entity_path_selects_latency_duration_and_intervals(self) -> None:
-        self.assertEqual(stage_from_entity_path("/detector/inference_latency_ms"), "detector_inference")
-        self.assertEqual(stage_from_entity_path("/detector/callback_duration_ms"), "detector_callback_duration")
-        self.assertEqual(stage_from_entity_path("/tracker/callback_interval_ms"), "tracker_callback_interval")
+    def test_stage_from_entity_path_preserves_millisecond_units(self) -> None:
+        self.assertEqual(stage_from_entity_path("/detector/inference_latency_ms"), "detector_inference_ms")
+        self.assertEqual(stage_from_entity_path("/detector/callback_duration_ms"), "detector_callback_duration_ms")
+        self.assertEqual(stage_from_entity_path("/detector/callback_interval_ms"), "detector_callback_interval_ms")
+        self.assertEqual(stage_from_entity_path("/tracker/callback_interval_ms"), "tracker_callback_interval_ms")
+        self.assertEqual(stage_from_entity_path("/tracker/association_latency_ms"), "tracker_association_ms")
+        self.assertEqual(stage_from_entity_path("/tracker/callback_duration_ms"), "tracker_callback_duration_ms")
+        self.assertEqual(stage_from_entity_path("/pipeline/end_to_end_latency_ms"), "pipeline_end_to_end_ms")
         self.assertIsNone(stage_from_entity_path("/detector/frame_drop_count"))
         self.assertIsNone(stage_from_entity_path("/tracker/active_tracks"))
 
@@ -44,8 +48,8 @@ class RrdToCsvTests(unittest.TestCase):
 
     def test_csv_rows_have_vm_import_column_order_and_no_header(self) -> None:
         samples = [
-            Sample(timestamp_ns=100_000_000, stage="detector_inference", value=8.42),
-            Sample(timestamp_ns=200_000_000, stage="pipeline_end_to_end", value=24.61),
+            Sample(timestamp_ns=100_000_000, stage="detector_inference_ms", value=8.42),
+            Sample(timestamp_ns=200_000_000, stage="pipeline_end_to_end_ms", value=24.61),
         ]
         with tempfile.TemporaryDirectory() as directory:
             output_path = Path(directory) / "latency.csv"
@@ -67,8 +71,8 @@ class RrdToCsvTests(unittest.TestCase):
         self.assertEqual(
             rows,
             [
-                ["999900", "run-001", "detector_inference", "jetson", "fp16", "1.5", "0020", "baseline", "8.42"],
-                ["1000000", "run-001", "pipeline_end_to_end", "jetson", "fp16", "1.5", "0020", "baseline", "24.61"],
+                ["999900", "run-001", "detector_inference_ms", "jetson", "fp16", "1.5", "0020", "baseline", "8.42"],
+                ["1000000", "run-001", "pipeline_end_to_end_ms", "jetson", "fp16", "1.5", "0020", "baseline", "24.61"],
             ],
         )
 
@@ -76,7 +80,7 @@ class RrdToCsvTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output_path = Path(directory) / "latency.csv"
             write_csv(
-                [Sample(1_000_000_000, "detector_inference", 1.0)],
+                [Sample(1_000_000_000, "detector_inference_ms", 1.0)],
                 output_path,
                 "run,one",
                 hardware="Jetson, Orin",
@@ -93,7 +97,7 @@ class RrdToCsvTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output_path = Path(directory) / "latency.csv"
             write_csv(
-                [Sample(1_000_000_000, "detector_inference", 1.0)],
+                [Sample(1_000_000_000, "detector_inference_ms", 1.0)],
                 output_path,
                 "run-001",
                 now_ms=1_000_000,
@@ -102,7 +106,7 @@ class RrdToCsvTests(unittest.TestCase):
             with output_path.open(newline="", encoding="utf-8") as csv_file:
                 row = next(csv.reader(csv_file))
 
-        self.assertEqual(row, ["1000000", "run-001", "detector_inference", "", "", "1.0", "", "", "1.0"])
+        self.assertEqual(row, ["1000000", "run-001", "detector_inference_ms", "", "", "1.0", "", "", "1.0"])
 
 
 if __name__ == "__main__":
