@@ -237,6 +237,12 @@ per-sequence tasks run concurrently; use `--max-workers` to change this limit. O
 `runs/<config>/eval/pipeline/kpi_<sequence>.csv`, `runs/<config>/eval/trackers/bytetrack/`, and
 `runs/<config>/eval/tracker_kpi.csv`.
 
+While sequences run, `run_kitti_sequences.py` records device metrics to
+`runs/<config>/eval/device_metrics.csv`. The VictoriaMetrics/Grafana ingestion script imports this CSV when present.
+To run the monitor directly, use
+`uv run scripts/monitor.py --hardware pc --config <config>` or
+`uv run scripts/monitor.py --hardware jetson --config <config>`. The monitor also accepts `--out-name` and `--freq`.
+
 To start the VictoriaMetrics/Grafana Compose stack and ingest every pipeline KPI CSV plus the tracker KPI CSV for that
 config:
 

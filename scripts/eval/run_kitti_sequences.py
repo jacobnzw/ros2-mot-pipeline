@@ -3,6 +3,9 @@
 import argparse
 import math
 import subprocess
+import os
+import signal
+
 from pathlib import Path
 
 import yaml
@@ -204,6 +207,40 @@ def launch_command(
     ]
 
 
+def start_monitor(hardware: str, config: str):
+    return subprocess.Popen(
+        [
+            "uv",
+            "run",
+            "scripts/monitor.py",
+            "--hardware",
+            "jetson" if hardware == "jetson" else "pc",
+            "--config",
+            config,
+        ],
+        stdout=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
+def stop_monitor(proc):
+    if proc.poll() is not None:
+        return
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        proc.wait()
+        return
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.wait()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the detector launch sequentially for each KITTI sequence MCAP.")
     parser.add_argument("--kitti-root", type=Path, default=DEFAULT_KITTI_ROOT, help="Root containing sequence folders")
@@ -233,6 +270,7 @@ def main() -> int:
     except (OSError, ValueError) as error:
         parser.error(str(error))
 
+    # Write config metadata.yaml
     repository_root = Path(__file__).resolve().parents[2]
     try:
         config_dir = repository_root / "runs" / args.config
@@ -255,23 +293,30 @@ def main() -> int:
     except (OSError, ValueError, RuntimeError) as error:
         parser.error(f"could not prepare run metadata or TrackEval ground truth: {error}")
 
-    print(f"Hardware: {hardware}")
-    print(f"Metadata: {metadata_path}")
-    for sequence in sequences:
-        command = launch_command(
-            sequence.name,
-            kitti_root,
-            args.n_threads,
-            args.precision,
-            args.config,
-            args.rate,
-            args.loop,
-        )
-        print(f"\n==> Running KITTI sequence {sequence.name}", flush=True)
-        result = subprocess.run(command, cwd=repository_root, check=False)
-        if result.returncode != 0:
-            print(f"Error: launch failed for sequence {sequence.name} (exit code {result.returncode})")
-            return result.returncode
+    # Launch temp/resource monitoring script in the background
+    monitor_proc = start_monitor(hardware, args.config)
+
+    try:
+        # Process every KITTI sequence using the MOT ROS2 pipeline
+        print(f"Hardware: {hardware}")
+        print(f"Metadata: {metadata_path}")
+        for sequence in sequences:
+            command = launch_command(
+                sequence.name,
+                kitti_root,
+                args.n_threads,
+                args.precision,
+                args.config,
+                args.rate,
+                args.loop,
+            )
+            print(f"\n==> Running KITTI sequence {sequence.name}", flush=True)
+            result = subprocess.run(command, cwd=repository_root, check=False)
+            if result.returncode != 0:
+                print(f"Error: launch failed for sequence {sequence.name} (exit code {result.returncode})")
+                return result.returncode
+    finally:
+        stop_monitor(monitor_proc)
 
     print(f"Completed {len(sequences)} sequence(s).")
     return 0

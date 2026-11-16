@@ -32,6 +32,7 @@ repo_root=$(cd -- "$script_dir/../.." && pwd)
 config_dir="$repo_root/runs/$config"
 pipeline_dir="$config_dir/eval/pipeline"
 tracker_kpi_csv="$config_dir/eval/tracker_kpi.csv"
+device_metrics_csv="$config_dir/eval/device_metrics.csv"
 
 shopt -s nullglob
 pipeline_csvs=("$pipeline_dir"/kpi_*.csv)
@@ -88,11 +89,17 @@ import_csv() {
 
 pipeline_format="1:time:unix_ms,2:label:run,3:label:name,4:label:hardware,5:label:precision,6:label:n_threads,7:label:rate,8:label:sequence,9:label:config,10:metric:pipeline_kpi"
 tracker_format="1:time:unix_ms,2:label:hardware,3:label:precision,4:label:n_threads,5:label:rate,6:label:config,7:label:tracker,8:label:sequence,9:label:class,10:label:metric,11:metric:mot_kpi"
+device_metrics_format="1:time:unix_ms,2:metric:cpu_temp_c,3:metric:cpu_usage_pct,4:metric:gpu_temp_c,5:metric:gpu_usage_pct,6:metric:gpu_mem_used_mb,7:metric:gpu_mem_total_mb,8:metric:aux_temp_c,9:metric:emc_usage_pct,10:metric:ram_used_mb,11:metric:ram_total_mb,12:metric:swap_used_mb,13:metric:power_mw,14:metric:fan_rpm,15:label:config,16:label:hardware"
 
 for csv_path in "${pipeline_csvs[@]}"; do
   import_csv "$csv_path" "$pipeline_format"
 done
 import_csv "$tracker_kpi_csv" "$tracker_format"
+if [[ -f $device_metrics_csv ]]; then
+  import_csv "$device_metrics_csv" "$device_metrics_format"
+else
+  echo "Skipping device metrics; CSV not found: $device_metrics_csv"
+fi
 
 echo "Done importing config '$config'."
 echo "Grafana: http://127.0.0.1:3000"

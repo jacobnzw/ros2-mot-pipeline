@@ -15,6 +15,7 @@ from scripts.eval.run_kitti_sequences import (
     launch_command,
     parse_sequences,
     positive_float,
+    start_monitor,
     write_metadata,
 )
 
@@ -136,6 +137,15 @@ class RunKittiSequencesTests(unittest.TestCase):
         command = launch_command("0019", Path("/dataset/mcaps"), 1, "fp32", "baseline", 1.0)
 
         self.assertIn("loop:=false", command)
+
+    def test_starts_the_unified_monitor_for_detected_hardware(self) -> None:
+        with patch("scripts.eval.run_kitti_sequences.subprocess.Popen") as popen:
+            start_monitor("jetson", "nightly")
+
+        self.assertEqual(
+            popen.call_args.args[0],
+            ["uv", "run", "scripts/monitor.py", "--hardware", "jetson", "--config", "nightly"],
+        )
 
     def test_metadata_quotes_yaml_special_characters(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
