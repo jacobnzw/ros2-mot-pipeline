@@ -1,3 +1,4 @@
+import csv
 import tempfile
 import threading
 import unittest
@@ -32,12 +33,12 @@ class EvaluatePipelineTests(unittest.TestCase):
         metadata_path.write_text(
             yaml.safe_dump(
                 {
-                    "thread_num": 2,
+                    "n_threads": 2,
                     "hardware": "rtx3090",
                     "precision": "fp16",
                     "rate": 1.5,
-                    "label": "baseline",
-                    "label_dir": "runs/baseline",
+                    "config": "baseline",
+                    "config_dir": "runs/baseline",
                     "trackeval_gt": str(eval_folder),
                     "trackeval_seqmap": str(seqmap_path),
                 }
@@ -46,10 +47,10 @@ class EvaluatePipelineTests(unittest.TestCase):
         )
         return metadata_path
 
-    def test_label_selects_run_metadata_from_repository_runs_directory(self) -> None:
+    def test_config_selects_metadata_from_repository_runs_directory(self) -> None:
         results = {"pipeline_kpi_csvs": [], "tracker_kpi_csv": Path("tracker_kpi.csv")}
         with (
-            patch("sys.argv", ["evaluate_pipeline.py", "--label", "baseline"]),
+            patch("sys.argv", ["evaluate_pipeline.py", "--config", "baseline"]),
             patch.object(evaluate_pipeline, "_build_driver") as build_driver,
         ):
             build_driver.return_value.execute.return_value = results
@@ -68,10 +69,24 @@ class EvaluatePipelineTests(unittest.TestCase):
             metadata_path = self._create_run(Path(directory), ())
             metadata = evaluate_pipeline.run_metadata(metadata_path)
 
-            self.assertEqual(metadata.label, "baseline")
-            self.assertEqual(metadata.label_dir, metadata_path.parent)
+            self.assertEqual(metadata.config, "baseline")
+            self.assertEqual(metadata.config_dir, metadata_path.parent)
+            self.assertEqual(metadata.n_threads, 2)
             self.assertEqual(metadata.rate, 1.5)
             self.assertEqual(metadata.trackeval_gt, metadata_path.parent / "eval")
+
+    def test_metadata_still_reads_legacy_label_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            metadata_path = self._create_run(Path(directory), ())
+            metadata_content = yaml.safe_load(metadata_path.read_text(encoding="utf-8"))
+            metadata_content["label"] = metadata_content.pop("config")
+            metadata_content["label_dir"] = metadata_content.pop("config_dir")
+            metadata_path.write_text(yaml.safe_dump(metadata_content), encoding="utf-8")
+
+            metadata = evaluate_pipeline.run_metadata(metadata_path)
+
+            self.assertEqual(metadata.config, "baseline")
+            self.assertEqual(metadata.config_dir, metadata_path.parent)
 
     def test_metadata_defaults_missing_playback_rate_to_one(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -83,6 +98,17 @@ class EvaluatePipelineTests(unittest.TestCase):
             metadata = evaluate_pipeline.run_metadata(metadata_path)
 
             self.assertEqual(metadata.rate, 1.0)
+
+    def test_metadata_reads_legacy_thread_num(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            metadata_path = self._create_run(Path(directory), ())
+            metadata_content = yaml.safe_load(metadata_path.read_text(encoding="utf-8"))
+            metadata_content["thread_num"] = metadata_content.pop("n_threads")
+            metadata_path.write_text(yaml.safe_dump(metadata_content), encoding="utf-8")
+
+            metadata = evaluate_pipeline.run_metadata(metadata_path)
+
+            self.assertEqual(metadata.n_threads, 2)
 
     def test_metadata_rejects_invalid_playback_rate(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -123,7 +149,7 @@ class EvaluatePipelineTests(unittest.TestCase):
                         readers_started_together.set()
                 if not readers_started_together.wait(timeout=5):
                     raise AssertionError("per-sequence work was not run concurrently")
-                return [Sample(1_000_000_000, "detector_inference", 1.0)]
+                return [Sample(1_000_000_000, "detector_inference_ms", 1.0)]
 
             def read_predictions(recording_path: Path, fps: float, first_frame_timestamp_ns: int) -> list:
                 return []
@@ -159,6 +185,14 @@ class EvaluatePipelineTests(unittest.TestCase):
             self.assertEqual(len(results["pipeline_kpi_csvs"]), 2)
             self.assertTrue(all(path.is_file() for path in results["pipeline_kpi_csvs"]))
             self.assertTrue(results["tracker_kpi_csv"].is_file())
+            with results["pipeline_kpi_csvs"][0].open(newline="", encoding="utf-8") as csv_file:
+                pipeline_row = next(csv.reader(csv_file))
+                self.assertEqual(pipeline_row[5], "2")
+                self.assertEqual(pipeline_row[8], "baseline")
+            with results["tracker_kpi_csv"].open(newline="", encoding="utf-8") as csv_file:
+                tracker_row = next(csv.reader(csv_file))
+                self.assertEqual(tracker_row[3], "2")
+                self.assertEqual(tracker_row[5], "baseline")
             self.assertTrue((metadata_path.parent / "eval" / "trackers" / "bytetrack" / "data" / "0018.txt").is_file())
 
 

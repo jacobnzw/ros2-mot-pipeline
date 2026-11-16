@@ -45,7 +45,8 @@ class TrackEvalToCsvTests(unittest.TestCase):
                 timestamp_ms=1_798_876_800_000,
                 hardware="jetson-orin",
                 precision="fp16",
-                label="baseline",
+                n_threads=4,
+                config="baseline",
             )
             with output_path.open(newline="", encoding="utf-8") as csv_file:
                 rows = list(csv.reader(csv_file))
@@ -57,6 +58,8 @@ class TrackEvalToCsvTests(unittest.TestCase):
                     "1798876800000",
                     "jetson-orin",
                     "fp16",
+                    "4",
+                    "1.0",
                     "baseline",
                     "bytetrack",
                     "0019",
@@ -67,7 +70,7 @@ class TrackEvalToCsvTests(unittest.TestCase):
             ],
         )
 
-    def test_metadata_labels_default_to_empty_columns(self) -> None:
+    def test_config_defaults_to_empty_csv_column(self) -> None:
         sample = KpiSample("bytetrack", "0019", "car", "HOTA", 0.5)
         with tempfile.TemporaryDirectory() as directory:
             output_path = Path(directory) / "trackeval.csv"
@@ -77,7 +80,7 @@ class TrackEvalToCsvTests(unittest.TestCase):
 
         self.assertEqual(
             row,
-            ["1798876800000", "", "", "", "bytetrack", "0019", "car", "HOTA", "0.5"],
+            ["1798876800000", "", "", "", "1.0", "", "bytetrack", "0019", "car", "HOTA", "0.5"],
         )
 
     def test_rejects_non_finite_trackeval_values(self) -> None:

@@ -15,6 +15,7 @@ from scripts.eval.run_kitti_sequences import (
     launch_command,
     parse_sequences,
     positive_float,
+    start_monitor,
     write_metadata,
 )
 
@@ -95,17 +96,19 @@ class RunKittiSequencesTests(unittest.TestCase):
                 "fp16",
                 "nightly-run",
                 1.5,
+                ["0020", "0001"],
             )
 
             self.assertEqual(
                 yaml.safe_load(metadata.read_text(encoding="utf-8")),
                 {
-                    "thread_num": 4,
+                    "n_threads": 4,
                     "hardware": "rtx3090",
                     "precision": "fp16",
                     "rate": 1.5,
-                    "label": "nightly-run",
-                    "label_dir": "runs/nightly-run",
+                    "sequences": ["0020", "0001"],
+                    "config": "nightly-run",
+                    "config_dir": "runs/nightly-run",
                     "kitti_gt": str(kitti_gt),
                     "kitti_root": str(kitti_root),
                     "trackeval_gt": str(trackeval_gt.resolve()),
@@ -120,7 +123,7 @@ class RunKittiSequencesTests(unittest.TestCase):
                 "ros2",
                 "launch",
                 "launch/detector_test.launch.py",
-                "thread_num:=4",
+                "n_threads:=4",
                 "seq:=0019",
                 "label:=nightly",
                 "precision:=fp16",
@@ -134,6 +137,15 @@ class RunKittiSequencesTests(unittest.TestCase):
         command = launch_command("0019", Path("/dataset/mcaps"), 1, "fp32", "baseline", 1.0)
 
         self.assertIn("loop:=false", command)
+
+    def test_starts_the_unified_monitor_for_detected_hardware(self) -> None:
+        with patch("scripts.eval.run_kitti_sequences.subprocess.Popen") as popen:
+            start_monitor("jetson", "nightly")
+
+        self.assertEqual(
+            popen.call_args.args[0],
+            ["uv", "run", "scripts/monitor.py", "--hardware", "jetson", "--config", "nightly"],
+        )
 
     def test_metadata_quotes_yaml_special_characters(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -149,10 +161,11 @@ class RunKittiSequencesTests(unittest.TestCase):
                 "fp16",
                 'baseline: "nightly"',
                 1.0,
+                ["0019"],
             )
 
             self.assertEqual(
-                yaml.safe_load(metadata.read_text(encoding="utf-8"))["label"],
+                yaml.safe_load(metadata.read_text(encoding="utf-8"))["config"],
                 'baseline: "nightly"',
             )
 

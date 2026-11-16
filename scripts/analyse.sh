@@ -5,7 +5,7 @@ set -euo pipefail
 
 # Print usage errors to stderr (>&2), keeping normal output separate.
 usage() {
-  echo "Usage: $0 path/to/recording.rrd [run-id] [--hw hardware] [--precision precision] [--seq sequence] [--label label]" >&2
+  echo "Usage: $0 path/to/recording.rrd [run-id] [--hw hardware] [--precision precision] [--n-threads count] [--seq sequence] [--config config]" >&2
 }
 
 # Accept the recording path, an optional run label, and optional metric labels.
@@ -38,9 +38,10 @@ if [[ $# -gt 0 && $1 != --* ]]; then
 fi
 
 hw=""
-quant=""
+precision=""
+n_threads=""
 seq=""
-label=""
+config=""
 while [[ $# -gt 0 ]]; do
   case $1 in
     --hw)
@@ -48,9 +49,14 @@ while [[ $# -gt 0 ]]; do
       hw=$2
       shift 2
       ;;
-    --quant)
+    --precision)
       [[ $# -ge 2 ]] || { usage; exit 2; }
-      quant=$2
+      precision=$2
+      shift 2
+      ;;
+    --n-threads)
+      [[ $# -ge 2 ]] || { usage; exit 2; }
+      n_threads=$2
       shift 2
       ;;
     --seq)
@@ -58,9 +64,9 @@ while [[ $# -gt 0 ]]; do
       seq=$2
       shift 2
       ;;
-    --label)
+    --config)
       [[ $# -ge 2 ]] || { usage; exit 2; }
-      label=$2
+      config=$2
       shift 2
       ;;
     *)
@@ -70,6 +76,11 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+n_threads_args=()
+if [[ -n $n_threads ]]; then
+  n_threads_args=(--n-threads "$n_threads")
+fi
 
 recording_path=$(realpath -- "$recording_arg")
 if [[ ! -f "$recording_path" ]]; then
@@ -115,7 +126,7 @@ cd -- "$repo_root"
 echo "==> Exporting latency samples from $recording_path (run: $run_id)"
 uv run --project "$repo_root" python "$repo_root/scripts/eval/extract_pipeline_kpi.py" \
   "$recording_path" --output "$csv_path" --run-id "$run_id" \
-  --hw "$hw" --quant "$quant" --seq "$seq" --label "$label"
+  --hw "$hw" --precision "$precision" "${n_threads_args[@]}" --seq "$seq" --config "$config"
 
 # TrackEval is an optional post-processing step. When its detailed result files
 # are present in the run folder, export their per-sequence and combined KPIs.
@@ -124,7 +135,7 @@ if [[ -n $trackeval_file ]]; then
   echo "==> Exporting TrackEval KPIs from $recording_dir"
   uv run --project "$repo_root" python "$repo_root/scripts/eval/trackeval_to_vm.py" \
     "$recording_dir" --output "$kpi_csv_path" --run-id "$run_id" \
-    --hw "$hw" --quant "$quant" --label "$label"
+    --hw "$hw" --precision "$precision" "${n_threads_args[@]}" --config "$config"
 else
   echo "==> No TrackEval detailed results found; skipping KPI export"
 fi
@@ -157,13 +168,13 @@ wait_for_service "http://127.0.0.1:8428/health" "VictoriaMetrics"
 wait_for_service "http://127.0.0.1:3000/api/health" "Grafana"
 
 # POST the CSV to the VictoriaMetric's import endpoint. In the format mapping, each number is a
-# one-based CSV column: timestamp, run/stage labels, optional metadata labels, and metric/value.
+# one-based CSV column: timestamp, run/name labels, optional metadata labels, and metric/value.
 # @file tells curl to read the request body from that file.
 echo "==> Importing CSV into VictoriaMetrics"
 curl --silent --show-error --fail-with-body \
   --request POST \
   --data-binary "@$csv_path" \
-  "http://127.0.0.1:8428/api/v1/import/csv?format=1:time:unix_ms,2:label:run,3:label:stage,4:label:hardware,5:label:precision,6:label:sequence,7:label:label,8:metric:pipeline_kpi"
+  "http://127.0.0.1:8428/api/v1/import/csv?format=1:time:unix_ms,2:label:run,3:label:name,4:label:hardware,5:label:precision,6:label:n_threads,7:label:rate,8:label:sequence,9:label:config,10:metric:pipeline_kpi"
 echo
 
 if [[ -n $trackeval_file && -f $kpi_csv_path ]]; then
@@ -171,17 +182,17 @@ if [[ -n $trackeval_file && -f $kpi_csv_path ]]; then
   curl --silent --show-error --fail-with-body \
     --request POST \
     --data-binary "@$kpi_csv_path" \
-    "http://127.0.0.1:8428/api/v1/import/csv?format=1:time:unix_ms,2:label:hardware,3:label:precision,4:label:label,5:label:tracker,6:label:sequence,7:label:class,8:label:metric,9:metric:mot_kpi"
+    "http://127.0.0.1:8428/api/v1/import/csv?format=1:time:unix_ms,2:label:hardware,3:label:precision,4:label:n_threads,5:label:rate,6:label:config,7:label:tracker,8:label:sequence,9:label:class,10:label:metric,11:metric:mot_kpi"
   echo
 fi
 
-# URL-encode the custom label before placing it in a query parameter.
-encoded_label=$(python3 -c 'import sys; from urllib.parse import quote; print(quote(sys.argv[1], safe=""))' "$label")
+# URL-encode the config value before placing it in a query parameter.
+encoded_config=$(python3 -c 'import sys; from urllib.parse import quote; print(quote(sys.argv[1], safe=""))' "$config")
 echo "Done."
 echo "Run: $run_id"
 dashboard_url="http://127.0.0.1:3000/d/ros2-latency/pipeline-details"
-if [[ -n $label ]]; then
-  dashboard_url+="?var-label=$encoded_label"
+if [[ -n $config ]]; then
+  dashboard_url+="?var-config=$encoded_config"
 fi
 echo "Grafana dashboard: $dashboard_url"
 echo "VictoriaMetrics UI: http://127.0.0.1:8428/vmui"

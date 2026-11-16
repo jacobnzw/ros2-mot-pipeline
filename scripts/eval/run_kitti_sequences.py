@@ -3,6 +3,9 @@
 import argparse
 import math
 import subprocess
+import os
+import signal
+
 from pathlib import Path
 
 import yaml
@@ -156,19 +159,21 @@ def write_metadata(
     kitti_gt: Path,
     trackeval_gt: Path,
     trackeval_seqmap: Path,
-    thread_num: int,
+    n_threads: int,
     hardware: str,
     precision: str,
-    label: str,
+    config: str,
     rate: float,
+    sequences: list[str],
 ) -> None:
     metadata = {
-        "thread_num": thread_num,
+        "n_threads": n_threads,
         "hardware": hardware,
         "precision": precision,
         "rate": rate,
-        "label": label,
-        "label_dir": f"runs/{label}",
+        "sequences": sequences,
+        "config": config,
+        "config_dir": f"runs/{config}",
         "kitti_gt": f"{kitti_gt}",
         "kitti_root": f"{kitti_root}",
         "trackeval_gt": str(trackeval_gt.resolve()),  # TODO: can't we just save to kitti_gt instead? extra field?
@@ -182,9 +187,9 @@ def write_metadata(
 def launch_command(
     sequence: str,
     kitti_root: Path,
-    thread_num: int,
+    n_threads: int,
     precision: str,
-    label: str,
+    config: str,
     rate: float,
     loop: bool = False,
 ) -> list[str]:
@@ -192,14 +197,48 @@ def launch_command(
         "ros2",
         "launch",
         "launch/detector_test.launch.py",
-        f"thread_num:={thread_num}",
+        f"n_threads:={n_threads}",
         f"seq:={sequence}",
-        f"label:={label}",
+        f"label:={config}",
         f"precision:={precision}",
         f"kitti_root:={kitti_root}",
         f"rate:={rate}",
         f"loop:={str(loop).lower()}",
     ]
+
+
+def start_monitor(hardware: str, config: str):
+    return subprocess.Popen(
+        [
+            "uv",
+            "run",
+            "scripts/monitor.py",
+            "--hardware",
+            "jetson" if hardware == "jetson" else "pc",
+            "--config",
+            config,
+        ],
+        stdout=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
+def stop_monitor(proc):
+    if proc.poll() is not None:
+        return
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        proc.wait()
+        return
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.wait()
 
 
 def main() -> int:
@@ -208,9 +247,9 @@ def main() -> int:
     parser.add_argument(
         "--kitti-gt", type=Path, default=DEFAULT_KITTI_GT, help="Root containing ground truth TXT file per sequence."
     )
-    parser.add_argument("--thread-num", type=positive_int, required=True, help="Detector container thread count")
+    parser.add_argument("--n-threads", type=positive_int, required=True, help="Detector container thread count")
     parser.add_argument("--precision", required=True, help="Detector model export precision, e.g. fp32 or fp16")
-    parser.add_argument("--label", required=True, help="Run label used for recording and metadata directories")
+    parser.add_argument("--config", required=True, help="Configuration name used for the runs/<config> directory")
     parser.add_argument("--rate", type=positive_float, default=1.0, help="MCAP playback rate multiplier (default: 1.0)")
     parser.add_argument("--loop", action="store_true", help="Loop MCAP playback indefinitely")
     parser.add_argument(
@@ -220,8 +259,8 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if not args.label or args.label in {".", ".."} or "/" in args.label or "\\" in args.label:
-        parser.error("--label must be a non-empty directory name without path separators")
+    if not args.config or args.config in {".", ".."} or "/" in args.config or "\\" in args.config:
+        parser.error("--config must be a non-empty directory name without path separators")
 
     kitti_root = args.kitti_root.expanduser().resolve()
     kitti_gt = args.kitti_gt.expanduser().resolve()
@@ -231,44 +270,53 @@ def main() -> int:
     except (OSError, ValueError) as error:
         parser.error(str(error))
 
+    # Write config metadata.yaml
     repository_root = Path(__file__).resolve().parents[2]
     try:
-        run_dir = repository_root / "runs" / args.label
-        eval_folder = run_dir / "eval"
+        config_dir = repository_root / "runs" / args.config
+        eval_folder = config_dir / "eval"
         seqmap_path = create_trackeval_gt(eval_folder, kitti_gt, sequences)
-        metadata_path = run_dir / "metadata.yaml"
+        metadata_path = config_dir / "metadata.yaml"
         write_metadata(
             metadata_path,
             kitti_root,
             kitti_gt,
             eval_folder,
             seqmap_path,
-            args.thread_num,
+            args.n_threads,
             hardware,
             args.precision,
-            args.label,
+            args.config,
             args.rate,
+            [sequence.name for sequence in sequences],
         )
     except (OSError, ValueError, RuntimeError) as error:
         parser.error(f"could not prepare run metadata or TrackEval ground truth: {error}")
 
-    print(f"Hardware: {hardware}")
-    print(f"Metadata: {metadata_path}")
-    for sequence in sequences:
-        command = launch_command(
-            sequence.name,
-            kitti_root,
-            args.thread_num,
-            args.precision,
-            args.label,
-            args.rate,
-            args.loop,
-        )
-        print(f"\n==> Running KITTI sequence {sequence.name}", flush=True)
-        result = subprocess.run(command, cwd=repository_root, check=False)
-        if result.returncode != 0:
-            print(f"Error: launch failed for sequence {sequence.name} (exit code {result.returncode})")
-            return result.returncode
+    # Launch temp/resource monitoring script in the background
+    monitor_proc = start_monitor(hardware, args.config)
+
+    try:
+        # Process every KITTI sequence using the MOT ROS2 pipeline
+        print(f"Hardware: {hardware}")
+        print(f"Metadata: {metadata_path}")
+        for sequence in sequences:
+            command = launch_command(
+                sequence.name,
+                kitti_root,
+                args.n_threads,
+                args.precision,
+                args.config,
+                args.rate,
+                args.loop,
+            )
+            print(f"\n==> Running KITTI sequence {sequence.name}", flush=True)
+            result = subprocess.run(command, cwd=repository_root, check=False)
+            if result.returncode != 0:
+                print(f"Error: launch failed for sequence {sequence.name} (exit code {result.returncode})")
+                return result.returncode
+    finally:
+        stop_monitor(monitor_proc)
 
     print(f"Completed {len(sequences)} sequence(s).")
     return 0
