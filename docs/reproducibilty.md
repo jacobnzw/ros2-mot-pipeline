@@ -217,6 +217,15 @@ The tracker folder must contain `data/<sequence>.txt`. The CLI selects the reque
 folder, including per-class summary and detailed result files under `bytetrack/`. Using the run folder as the output
 folder keeps the TrackEval results beside `recording.rrd`.
 
+To run every KITTI sequence for the FP32/FP16, 1/4-thread, and 1.0/1.5/2.0/3.0-rate grid:
+
+```shell
+uv run scripts/eval/run_grid.py --config-basename <config-basename>
+```
+
+Each combination is run sequentially through `run_kitti_sequences.py` and gets a config label such as
+`<config-basename>_FP32_t1_r1.0`.
+
 ### Hamilton evaluation pipeline
 
 After `scripts/eval/run_kitti_sequences.py` has created the recordings and `metadata.yaml`, run the Hamilton DAG for the
