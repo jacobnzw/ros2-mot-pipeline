@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <memory>
 #include <stdexcept>
 
@@ -20,9 +21,16 @@ TrackerComponent::TrackerComponent(const rclcpp::NodeOptions &options) : Node("t
   declare_parameter("match_threshold", 0.8);      // max (1 - IoU) cost in the first association
   declare_parameter("track_buffer", 10);          // frames a lost track is kept for re-identification
   declare_parameter("frame_rate", 10.0);
+  declare_parameter("q_depth", 1);
   declare_parameter("fuse_score", true);
   declare_parameter("log_tracks", true);
   declare_parameter("recording_path", std::string("runs/recording.rrd"));
+
+  const auto q_depth_param = get_parameter("q_depth").as_int();
+  if (q_depth_param < 1) {
+    throw std::invalid_argument("q_depth must be greater than zero");
+  }
+  const auto q_depth = static_cast<std::size_t>(q_depth_param);
 
   ByteTrackerOptions tracker_options;
   tracker_options.high_threshold = static_cast<float>(get_parameter("high_threshold").as_double());
@@ -46,7 +54,7 @@ TrackerComponent::TrackerComponent(const rclcpp::NodeOptions &options) : Node("t
   // SUBSCRIPTION for detection messages
   // Separate callback group to allow parallel execution with detector component in MultiThreaded executor
   const auto detections_topic = get_parameter("detections_topic").as_string();
-  const auto qos_sub = rclcpp::SensorDataQoS().keep_last(1);
+  const auto qos_sub = rclcpp::SensorDataQoS().keep_last(q_depth);
   rclcpp::SubscriptionOptions sub_opts;
   sub_opts.callback_group = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   detections_sub_ = create_subscription<msg::TimedDetection2DArray>(

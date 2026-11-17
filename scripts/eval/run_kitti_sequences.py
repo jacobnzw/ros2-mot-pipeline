@@ -160,6 +160,7 @@ def write_metadata(
     trackeval_gt: Path,
     trackeval_seqmap: Path,
     n_threads: int,
+    q_depth: int,
     hardware: str,
     precision: str,
     config: str,
@@ -168,6 +169,7 @@ def write_metadata(
 ) -> None:
     metadata = {
         "n_threads": n_threads,
+        "q_depth": q_depth,
         "hardware": hardware,
         "precision": precision,
         "rate": rate,
@@ -192,12 +194,14 @@ def launch_command(
     config: str,
     rate: float,
     loop: bool = False,
+    q_depth: int = 1,
 ) -> list[str]:
     return [
         "ros2",
         "launch",
         "launch/detector_test.launch.py",
         f"n_threads:={n_threads}",
+        f"q_depth:={q_depth}",
         f"seq:={sequence}",
         f"label:={config}",
         f"precision:={precision}",
@@ -248,6 +252,12 @@ def main() -> int:
         "--kitti-gt", type=Path, default=DEFAULT_KITTI_GT, help="Root containing ground truth TXT file per sequence."
     )
     parser.add_argument("--n-threads", type=positive_int, required=True, help="Detector container thread count")
+    parser.add_argument(
+        "--q-depth",
+        type=positive_int,
+        default=1,
+        help="Keep-last queue depth between detector output and tracker input (default: 1)",
+    )
     parser.add_argument("--precision", required=True, help="Detector model export precision, e.g. fp32 or fp16")
     parser.add_argument("--config", required=True, help="Configuration name used for the runs/<config> directory")
     parser.add_argument("--rate", type=positive_float, default=1.0, help="MCAP playback rate multiplier (default: 1.0)")
@@ -284,6 +294,7 @@ def main() -> int:
             eval_folder,
             seqmap_path,
             args.n_threads,
+            args.q_depth,
             hardware,
             args.precision,
             args.config,
@@ -309,6 +320,7 @@ def main() -> int:
                 args.config,
                 args.rate,
                 args.loop,
+                args.q_depth,
             )
             print(f"\n==> Running KITTI sequence {sequence.name}", flush=True)
             result = subprocess.run(command, cwd=repository_root, check=False)

@@ -7,6 +7,7 @@ from launch.events import Shutdown
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, TextSubstitution
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
+from launch_ros.parameter_descriptions import ParameterValue
 
 from launch import LaunchContext, LaunchDescription
 
@@ -15,6 +16,7 @@ log_input_image = LaunchConfiguration("log_input_image")
 log_detections = LaunchConfiguration("log_detections")
 log_tracks = LaunchConfiguration("log_tracks")
 n_threads = LaunchConfiguration("n_threads")
+q_depth = LaunchConfiguration("q_depth")
 loop = LaunchConfiguration("loop")
 seq = LaunchConfiguration("seq")
 kitti_root = LaunchConfiguration("kitti_root")
@@ -65,6 +67,7 @@ def generate_launch_description():
                         "model_path": str(model_path),
                         "image_topic": "/camera/image_raw/compressed",
                         "detection_topic": "/detections",
+                        "q_depth": ParameterValue(q_depth, value_type=int),
                         "log_input_image": log_input_image,
                         "log_detections": log_detections,
                         "recording_path": recording_path,
@@ -81,6 +84,7 @@ def generate_launch_description():
                     {
                         "use_sim_time": True,
                         "detections_topic": "/detections",
+                        "q_depth": ParameterValue(q_depth, value_type=int),
                         "tracks_topic": "~/tracks",
                         "high_threshold": 0.25,  # detections above this take part in the first association
                         "low_threshold": 0.1,  # (low, high) detections only rescue existing tracks
@@ -147,6 +151,11 @@ def generate_launch_description():
                 "n_threads",
                 default_value="1",
                 description="Number of threads to use. If > 1 multi-threaded executor is used.",
+            ),
+            DeclareLaunchArgument(
+                "q_depth",
+                default_value="1",
+                description="Keep-last queue depth for detector output and tracker input.",
             ),
             DeclareLaunchArgument(
                 "precision",
