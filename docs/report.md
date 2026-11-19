@@ -104,13 +104,15 @@ That set is hot enough for a strong report, fully supported by the observability
 that the rented Jetson time stays focused on measurement rather than new feature work.
 
 
-# Experiments
+TODO: Changing the QoS queue depth in .keep_last() in the detections handoff to the tracker had no effect on frame drop
+counts
 
-## Protocol
 
-### Platforms
+# Experiment Design & Protocol
 
-#### PC
+## Platforms
+
+### PC
 The term "PC" refers to the following platform spec:
 
 | Specification | Details |
@@ -122,7 +124,7 @@ The term "PC" refers to the following platform spec:
 | Environment | WSL2 Ubuntu 24.04 |
 
 
-#### Jetson
+### Jetson
 The term "Jetson" refers to the following platform spec:
 
 | Specification | Details |
@@ -150,10 +152,10 @@ CUDA_VERSION=13.2 jetson-containers build \
 ```
 
 
-### Run Configurations
+## Run Configurations
 
-I ran (2*3*3 = 18) design configurations on both platforms using the `scripts/run_grid.py` defined as Cartesian product
-of the following axes:
+I ran (2 x 3 x 3 = 18) design configurations on both platforms using the `scripts/run_grid.py` defined as Cartesian
+product of the following axes:
 
 ```python
 PRECISIONS = ("fp32", "fp16")
@@ -161,11 +163,12 @@ THREAD_COUNTS = (1, 2, 4)
 RATES = (1.0, 2.0, 3.0)
 ```
 
-### Measured KPIs
+## Measured KPIs
 
 All logging was done via ReRun into an *.rrd files for easy viewing.
 
-#### Hardware
+### Hardware
+
 Hardware resource usage and sensor readings were measured to contextualize pipeline performance:
 
 | Resource / sensor | Notes |
@@ -179,8 +182,10 @@ Hardware resource usage and sensor readings were measured to contextualize pipel
 Sensor availability and measurement scope may differ between the PC and Jetson. On PC, I relied on `psutils` and on
 Jetson I used [`jetson-stats`](https://github.com/rbonghi/jetson_stats).
 
-#### ROS2 Pipeline
+### ROS2 Pipeline
+
 I measured and logged the following pipeline KPIs
+
 | KPI | Notes |
 |:----|:------|
 | `pipeline/end_to_end_latency_ms` | Time from image timestamp to publishing the corresponding tracks; measures end-to-end responsiveness. |
@@ -196,7 +201,7 @@ I measured and logged the following pipeline KPIs
 | `tracker/frame_drop_count` | Cumulative number of frames dropped or skipped by the tracker. |
 
 
-#### Multi-Object Tracking
+### Multi-Object Tracking
 
 The resulting 2D tracks were also logged to compute the following MOT KPIs using
 [`TrackEval`](https://github.com/JonathonLuiten/TrackEval) utilty:
@@ -209,35 +214,67 @@ The resulting 2D tracks were also logged to compute the following MOT KPIs using
 
 
 ### Questions 
-Given these run configurations and KPIs the following questions about the MOT pipeline performance were analysed:
+Given the platforms, the run configurations and the measured KPIs, the following questions about the ROS2 MOT pipeline
+performance were analysed:
 
 - **Platform Effect:** How do end-to-end latency, component latencies, frame drops, and MOT metrics change when moving
   from PC to Jetson at matched precision (FP32 and FP16 separately)?
-- **Precision Effect:** How does FP16 Jetson compare against the FP32 PC baseline?
-- **Executor Threading Effect:** Does `MultiThreaded` executor have any effect?
-- **Load / replay rate Effect:** How does the performance change with increased replay rate?
+- **Precision Effect:** What is the latency / frame drop / tracking-quality trade-off of FP16 vs FP32?
+- **Executor Threading Effect:** Does increasing from 1 → 2 → 4 threads change latency tails, drop counts, or MOT
+  metrics on either platform?
+- **Load Effect:**
+  - How do latency distributions and frame-drop counts scale with rate (1.0 / 2.0 / 3.0)?
+  - At what point does the pipeline saturate on each platform?
 - **Load x Platform Interaction:** Does the Jetson degrade more sharply than the PC as rate increases?
-- The resource consumption aspect: What's the resource consumption on Jetson?
+- **Deployment Effect:**
+  - What's the MOT performance delta against PC @ FP32 baseline when I move the MOT pipeline to Jetson @ FP16 precision?
+- **Resource Consumption:** What's the CPU / GPU utilisation, memory, and power / temperature under the different
+  configurations?
 
-Each of these questions are further elaborated on in the sections that follow.
+Each of these questions are further elaborated on in the Results section.
 
 
-## Results
 
-### Executors: SingleThreaded vs MultiThreaded
+
+# Results
+
+## Platform Effect
+
+TODO: PC @ FP32 vs Jetson @ FP32: latencies, drops and MOT KPI deltas TODO: PC @ FP16 vs Jetson @ FP16: latencies, drops
+and MOT KPI deltas
+
+TODO: fix rate and threads for comparison or average over all? Executor Threading effect section should give clear
+guidance.
+
+## Precision Effect
+
+TODO: compare FP32 vs FP16 on inference/end-to-end latencies vs. HOTA, MOTP, IDF1, draw conclusions
+
+TODO: compare PC FP16 vs Jetson FP16 on inference/end-to-end latencies vs. HOTA, MOTP, IDF1, draw conclusions
+
+
+## Executor Threading Effect
 
 TODO: compare latencies on t1 vs t2 vs t4 runs: high-level across sequences
 
 TODO: compare latencies on t1 vs t2 vs t4 runs: heatmaps / percentiles over time on 0019
 
 
-### Performance under Stress
+## Load Effect
 
 TODO: compare frame drop counts vs. replay rates vs. platform
 
 
-### Precision Trade-Off: Full vs Half
+## Load x Platform Interaction
 
-TODO: compare FP32 vs FP16 on inference/end-to-end latencies vs. HOTA, MOTP, IDF1, draw conclusions
+TODO: compare how load affects PC vs Jetson differently
 
-TODO: compare PC FP16 vs Jetson FP16 on inference/end-to-end latencies vs. HOTA, MOTP, IDF1, draw conclusions
+
+## Deployment Effect
+
+TODO: plots: MOT KPIs delta between PC FP32 and Jetson FP16
+
+
+## Resource Consumption
+
+TODO: summarise CPU/GPU usage, memory, and power for different configs
