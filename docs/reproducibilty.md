@@ -235,6 +235,10 @@ whole config:
 uv run scripts/eval/evaluate_pipeline.py --config <config>
 ```
 
+`--config` also accepts a quoted glob pattern matched against directory names in `runs/`, for example
+`--config 'rtx3090*'`. Every matching directory that contains `metadata.yaml` is evaluated in turn. If a config fails,
+the remaining ones still run, a summary is printed, and the exit code is non-zero.
+
 Alternatively, pass an explicit metadata path with `--metadata runs/<config>/metadata.yaml`.
 
 `run_kitti_sequences.py --config <config>` creates `runs/<config>/eval/label_02` as a symlink to the configured KITTI
@@ -252,22 +256,23 @@ To run the monitor directly, use
 `uv run scripts/monitor.py --hardware pc --config <config>` or
 `uv run scripts/monitor.py --hardware jetson --config <config>`. The monitor also accepts `--out-name` and `--freq`.
 
-To start the VictoriaMetrics/Grafana Compose stack and ingest every pipeline KPI CSV plus the tracker KPI CSV for that
-config:
+To start the VictoriaMetrics/Grafana Compose stack and ingest every pipeline KPI CSV, the tracker KPI CSV, and the
+device metrics CSV (when present) for a config:
 
 ```shell
 scripts/eval/vm_grafana_ingest.sh <config>
 ```
 
-The script waits for both services to be ready before importing the CSVs. The stack and persistent Docker volumes remain
-running after ingestion.
+The argument may also be a quoted glob pattern matched against directory names in `runs/`, which ingests every matching
+config (for example, `'rtx3090*'`). Quote the pattern so the shell does not expand it. Matching configs without the
+required KPI CSVs are skipped with a warning; the script fails if none can be ingested. The script waits for both
+services to be ready before importing the CSVs. The stack and persistent Docker volumes remain running after ingestion.
 
-Run `scripts/analyse.sh` with the recording path and metric dimensions to export the RRD latency samples and, when
-TrackEval detailed results are present, write `trackeval.csv` beside `latency.csv` and import both CSVs into
-VictoriaMetrics:
+Pass `--ingest-only` to skip starting the Compose stack and only POST the CSVs to an already running VictoriaMetrics at
+`127.0.0.1:8428`:
 
-```bash
-scripts/analyse.sh runs/<run-id>/recording.rrd --hw jetson-orin --precision fp16 --config baseline
+```shell
+scripts/eval/vm_grafana_ingest.sh --ingest-only 'rtx3090*'
 ```
 
 The KPI CSV contains one row per TrackEval summary metric, class, and sequence, including TrackEval's `COMBINED` row,

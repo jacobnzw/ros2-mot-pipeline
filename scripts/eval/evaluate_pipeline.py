@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import fnmatch
 import math
 import sys
 from dataclasses import dataclass
@@ -15,6 +16,8 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from scripts.eval import extract_pipeline_kpi, extract_tracker_preds_to_kitti, run_trackeval, trackeval_to_vm
+
+RUNS_DIR = Path(__file__).resolve().parents[2] / "runs"
 
 
 @dataclass(frozen=True)
@@ -233,6 +236,20 @@ def _positive_int(value: str) -> int:
     return parsed
 
 
+def resolve_config_metadata(pattern: str, runs_dir: Path) -> list[Path]:
+    """Return metadata.yaml paths of runs/ directories whose names match the glob pattern."""
+    metadata_paths = []
+    for config_dir in sorted(path for path in runs_dir.iterdir() if path.is_dir()):
+        if not fnmatch.fnmatchcase(config_dir.name, pattern):
+            continue
+        metadata_path = config_dir / "metadata.yaml"
+        if metadata_path.is_file():
+            metadata_paths.append(metadata_path)
+        else:
+            print(f"Skipping '{config_dir.name}': no metadata.yaml", file=sys.stderr)
+    return metadata_paths
+
+
 def _main() -> int:
     parser = argparse.ArgumentParser(
         description="Extract pipeline and tracker KPIs for a detector run using an Apache Hamilton DAG."
@@ -240,7 +257,11 @@ def _main() -> int:
     metadata_group = parser.add_mutually_exclusive_group(required=True)
     metadata_group.add_argument("--metadata", type=Path, help="Path to the run metadata YAML")
     metadata_group.add_argument(
-        "--config", help="Configuration name; loads runs/<config>/metadata.yaml from the repository root"
+        "--config",
+        help=(
+            "Configuration name or glob pattern (quote it, e.g. 'rtx3090*'); evaluates every matching "
+            "runs/<config>/metadata.yaml from the repository root"
+        ),
     )
     parser.add_argument(
         "--max-workers",
@@ -252,19 +273,39 @@ def _main() -> int:
 
     if args.config is not None:
         if not args.config or args.config in {".", ".."} or "/" in args.config or "\\" in args.config:
-            parser.error("--config must be a non-empty directory name without path separators")
-        metadata_path = Path(__file__).resolve().parents[2] / "runs" / args.config / "metadata.yaml"
+            parser.error("--config must be a non-empty name or glob pattern without path separators")
+        metadata_paths = resolve_config_metadata(args.config, RUNS_DIR) if RUNS_DIR.is_dir() else []
+        if not metadata_paths:
+            parser.error(f"no run directories with metadata.yaml in {RUNS_DIR} match '{args.config}'")
     else:
-        metadata_path = args.metadata
+        metadata_paths = [args.metadata]
 
-    results = _build_driver(args.max_workers).execute(
-        ["pipeline_kpi_csvs", "tracker_kpi_csv"],
-        inputs={"metadata_path": metadata_path},
-    )
-    print("Pipeline KPI CSVs:")
-    for path in results["pipeline_kpi_csvs"]:
-        print(f"  {path}")
-    print(f"Tracker KPI CSV: {results['tracker_kpi_csv']}")
+    hamilton_driver = _build_driver(args.max_workers)
+    failures: list[tuple[str, Exception]] = []
+    for metadata_path in metadata_paths:
+        name = metadata_path.parent.name
+        print(f"==> Config '{name}'", flush=True)
+        try:
+            results = hamilton_driver.execute(
+                ["pipeline_kpi_csvs", "tracker_kpi_csv"],
+                inputs={"metadata_path": metadata_path},
+            )
+        except Exception as error:  # keep evaluating the remaining configs
+            if len(metadata_paths) == 1:
+                raise
+            print(f"Error: config '{name}' failed: {error}", file=sys.stderr)
+            failures.append((name, error))
+            continue
+        print("Pipeline KPI CSVs:")
+        for path in results["pipeline_kpi_csvs"]:
+            print(f"  {path}")
+        print(f"Tracker KPI CSV: {results['tracker_kpi_csv']}")
+
+    if failures:
+        print(f"\n{len(failures)} of {len(metadata_paths)} config(s) failed:", file=sys.stderr)
+        for name, error in failures:
+            print(f"  {name}: {error}", file=sys.stderr)
+        return 1
     return 0
 
 

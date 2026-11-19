@@ -11,7 +11,7 @@ rosdep once per machine; skip `rosdep init` if it has already been initialized.
 
 ```bash
 sudo apt update
-sudo apt install ros-jazzy-ros-base ros-dev-tools libopencv-dev
+sudo apt install ros-jazzy-ros-base ros-dev-tools libopencv-dev libfmt-dev
 sudo rosdep init
 rosdep update
 source /opt/ros/jazzy/setup.zsh
@@ -152,9 +152,9 @@ uv run scripts/eval/run_kitti_sequences.py \
 detects Jetson or RTX 3090 hardware, writes `runs/<config>/metadata.yaml` with the configuration, `n_threads`, and the
 selected sequence IDs, and stops if a sequence launch fails. `--rate` sets the MCAP playback speed and defaults to
 `1.0`. Pass `--loop` to loop playback indefinitely; in that mode, the runner will not proceed to the next sequence. The
-`precision` launch argument selects
-`models/yolo/yolo11n_<precision>.onnx` (for example, `precision:=FP32` selects `models/yolo/yolo11n_fp32.onnx`).
-Precision values may be lowercase or uppercase, and the selected model file must exist.
+`precision` launch argument selects `models/yolo/yolo11n_<precision>.onnx` (for example, `precision:=FP32` selects
+`models/yolo/yolo11n_fp32.onnx`). Precision values may be lowercase or uppercase, and the selected model file must
+exist.
 
 The C++ SDK fetched by CMake writes Rerun data, but does not install the standalone Rerun viewer/CLI. Install the viewer
 separately, for example with `uv tool install rerun-sdk` (see the
@@ -174,28 +174,27 @@ ROS simulated time. Every Rerun log event is indexed on both `ros2_timestamp` (m
 (elapsed monotonic time since recording initialization). This preserves source-frame alignment while giving looped MCAP
 replays a non-repeating time axis. The same event is logged once with both timeline coordinates.
 
-To export latency, duration, and callback-interval scalar samples to VictoriaMetrics and open Grafana, run:
+To export latency, duration, and callback-interval scalar samples to VictoriaMetrics and open Grafana, evaluate the
+config and ingest it (see `docs/reproducibilty.md`):
 
 ```bash
-scripts/analyse.sh runs/<run-id>/recording.rrd \
-  --hw jetson-orin --precision fp16 --n-threads 1 --seq 0020 --config baseline
+uv run scripts/eval/evaluate_pipeline.py --config baseline
+scripts/eval/vm_grafana_ingest.sh baseline
 ```
 
-The script writes `latency.csv` beside the recording and, if TrackEval detailed results are present under the same run
-folder, writes `trackeval.csv` there too. It starts the Compose services, waits for them to respond, and imports both
-CSVs into VictoriaMetrics. Latency rows have columns
-`timestamp_ms,run,name,hardware,precision,n_threads,rate,sequence,config,value` and become `pipeline_kpi` samples. The
-`--hw`, `--precision`, `--n-threads`, `--seq`, and `--config` options supply values for the corresponding metric label
-keys and default to empty strings. The standalone importer uses a rate of `1.0`; `evaluate_pipeline.py` uses the rate
-from run metadata. TrackEval rows have columns
+The evaluation writes per-sequence pipeline KPI CSVs and a tracker KPI CSV under `runs/<config>/eval/`, and the ingest
+script starts the Compose services, waits for them to respond, and imports the CSVs into VictoriaMetrics. Latency rows
+have columns
+`timestamp_ms,run,name,hardware,precision,n_threads,rate,sequence,config,value` and become `pipeline_kpi` samples.
+`evaluate_pipeline.py` takes the label values and rate from the run metadata; the standalone exporter's `--hw`,
+`--precision`, `--n-threads`, `--seq`, and `--config` options default to empty strings and its rate to `1.0`. TrackEval rows have columns
 `timestamp_ms,hardware,precision,n_threads,rate,config,tracker,sequence,class,metric,value` and become `mot_kpi` samples
 with values assigned to the metric label keys `hardware`, `precision`, `n_threads`, `rate`, `config`, `tracker`,
 `sequence`, `class`, and `metric`. TrackEval timestamps use the newest detailed-results file modification time; score
-values are ratios in
-`[0, 1]`, while count metrics remain counts. The run label defaults to the recording directory name; pass an optional
-second argument to `analyse.sh` to override it. The `name` label comes from the Rerun entity path (for example,
-`/detector/inference_latency_ms` becomes `detector_inference_ms`). Counters and other non-duration scalars are omitted. You
-can also run
+values are ratios in `[0, 1]`, while count metrics remain counts. The run label is the recording directory
+name. The `name` label comes from the Rerun entity path
+(for example, `/detector/inference_latency_ms` becomes `detector_inference_ms`). Counters and other non-duration scalars
+are omitted. You can also run
 `uv run scripts/eval/extract_pipeline_kpi.py runs/<run-id>/recording.rrd --hw jetson-orin --precision fp16 --n-threads 1 --seq 0020 --config baseline`
 to export the CSV without importing it.
 

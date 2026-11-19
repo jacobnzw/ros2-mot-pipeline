@@ -47,22 +47,65 @@ class EvaluatePipelineTests(unittest.TestCase):
         )
         return metadata_path
 
-    def test_config_selects_metadata_from_repository_runs_directory(self) -> None:
+    def test_config_glob_evaluates_every_matching_run_and_reports_failures(self) -> None:
         results = {"pipeline_kpi_csvs": [], "tracker_kpi_csv": Path("tracker_kpi.csv")}
-        with (
-            patch("sys.argv", ["evaluate_pipeline.py", "--config", "baseline"]),
-            patch.object(evaluate_pipeline, "_build_driver") as build_driver,
-        ):
-            build_driver.return_value.execute.return_value = results
+        with tempfile.TemporaryDirectory() as directory:
+            runs_dir = Path(directory)
+            for name in ("rtx_a", "rtx_b", "rtx_nometa", "orin_a"):
+                (runs_dir / name).mkdir()
+                if name != "rtx_nometa":
+                    (runs_dir / name / "metadata.yaml").touch()
+            (runs_dir / "rtx_file").touch()
 
-            self.assertEqual(evaluate_pipeline._main(), 0)
+            def execute(_outputs: list[str], inputs: dict) -> dict:
+                if inputs["metadata_path"].parent.name == "rtx_b":
+                    raise ValueError("boom")
+                return results
 
-        repository_root = Path(evaluate_pipeline.__file__).resolve().parents[2]
-        build_driver.assert_called_once_with(4)
-        build_driver.return_value.execute.assert_called_once_with(
-            ["pipeline_kpi_csvs", "tracker_kpi_csv"],
-            inputs={"metadata_path": repository_root / "runs" / "baseline" / "metadata.yaml"},
-        )
+            with (
+                patch("sys.argv", ["evaluate_pipeline.py", "--config", "rtx*"]),
+                patch.object(evaluate_pipeline, "RUNS_DIR", runs_dir),
+                patch.object(evaluate_pipeline, "_build_driver") as build_driver,
+            ):
+                build_driver.return_value.execute.side_effect = execute
+
+                self.assertEqual(evaluate_pipeline._main(), 1)
+
+            build_driver.assert_called_once_with(4)
+            evaluated = [
+                call.kwargs["inputs"]["metadata_path"] for call in build_driver.return_value.execute.call_args_list
+            ]
+            self.assertEqual(evaluated, [runs_dir / "rtx_a" / "metadata.yaml", runs_dir / "rtx_b" / "metadata.yaml"])
+
+    def test_config_single_name_evaluates_only_that_run(self) -> None:
+        results = {"pipeline_kpi_csvs": [], "tracker_kpi_csv": Path("tracker_kpi.csv")}
+        with tempfile.TemporaryDirectory() as directory:
+            runs_dir = Path(directory)
+            for name in ("baseline", "baseline_2"):
+                (runs_dir / name).mkdir()
+                (runs_dir / name / "metadata.yaml").touch()
+            with (
+                patch("sys.argv", ["evaluate_pipeline.py", "--config", "baseline"]),
+                patch.object(evaluate_pipeline, "RUNS_DIR", runs_dir),
+                patch.object(evaluate_pipeline, "_build_driver") as build_driver,
+            ):
+                build_driver.return_value.execute.return_value = results
+
+                self.assertEqual(evaluate_pipeline._main(), 0)
+
+            build_driver.return_value.execute.assert_called_once_with(
+                ["pipeline_kpi_csvs", "tracker_kpi_csv"],
+                inputs={"metadata_path": runs_dir / "baseline" / "metadata.yaml"},
+            )
+
+    def test_config_without_match_is_an_error(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            with (
+                patch("sys.argv", ["evaluate_pipeline.py", "--config", "nomatch*"]),
+                patch.object(evaluate_pipeline, "RUNS_DIR", Path(directory)),
+                self.assertRaises(SystemExit),
+            ):
+                evaluate_pipeline._main()
 
     def test_metadata_resolves_run_and_ground_truth_directories(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
