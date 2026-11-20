@@ -23,15 +23,6 @@ class Sample:
     value: float
 
 
-def name_from_entity_path(entity_path: str) -> str | None:
-    name = entity_path.strip("/").replace("/", "_")
-    if name.endswith("_latency_ms"):
-        return name[: -len("_latency_ms")] + "_ms"
-    if name.endswith(("_duration_ms", "_interval_ms")):
-        return name
-    return None
-
-
 def select_timestamp_column(column_names: list[str]) -> str:
     if STEADY_ELAPSED_COLUMN in column_names:
         return STEADY_ELAPSED_COLUMN
@@ -46,10 +37,7 @@ def read_latency_samples(recording_path: Path) -> list[Sample]:
     samples: list[Sample] = []
 
     for chunk in stream:
-        name = name_from_entity_path(chunk.entity_path)
-        if name is None:
-            continue
-
+        name = chunk.entity_path.strip("/").replace("/", "_")
         batch = chunk.to_record_batch()
         timeline_column = select_timestamp_column(batch.schema.names)
         timestamps = batch.column(timeline_column)
@@ -89,7 +77,7 @@ def write_csv(
     n_threads: int | None = None,
 ) -> None:
     if not samples:
-        raise ValueError("recording contains no finite latency or duration scalar samples")
+        raise ValueError("recording contains no finite pipeline KPI scalar samples")
     if not run_id:
         raise ValueError("run label must not be empty")
 
@@ -118,7 +106,7 @@ def write_csv(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Export Rerun latency and duration scalars as VictoriaMetrics CSV import rows."
+        description="Export Rerun scalar samples as VictoriaMetrics CSV import rows."
     )
     parser.add_argument("recording", type=Path, help="Input Rerun .rrd file")
     parser.add_argument(
@@ -172,7 +160,7 @@ def main() -> None:
     except (OSError, RuntimeError, ValueError) as error:
         parser.error(str(error))
 
-    print(f"Exported {len(samples):,} latency/duration samples to {output_path}")
+    print(f"Exported {len(samples):,} pipeline KPI samples to {output_path}")
     print(f"Run label: {run_id}")
     print(f"Hardware: {args.hw}; precision: {args.precision}; sequence: {args.seq}; config: {args.config}")
 

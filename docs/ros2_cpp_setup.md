@@ -174,8 +174,8 @@ ROS simulated time. Every Rerun log event is indexed on both `ros2_timestamp` (m
 (elapsed monotonic time since recording initialization). This preserves source-frame alignment while giving looped MCAP
 replays a non-repeating time axis. The same event is logged once with both timeline coordinates.
 
-To export latency, duration, and callback-interval scalar samples to VictoriaMetrics and open Grafana, evaluate the
-config and ingest it (see `docs/reproducibilty.md`):
+To export all Rerun scalar samples to VictoriaMetrics and open Grafana, evaluate the config and ingest it (see
+`docs/reproducibilty.md`):
 
 ```bash
 uv run scripts/eval/evaluate_pipeline.py --config baseline
@@ -183,7 +183,7 @@ scripts/eval/vm_grafana_ingest.sh baseline
 ```
 
 The evaluation writes per-sequence pipeline KPI CSVs and a tracker KPI CSV under `runs/<config>/eval/`, and the ingest
-script starts the Compose services, waits for them to respond, and imports the CSVs into VictoriaMetrics. Latency rows
+script starts the Compose services, waits for them to respond, and imports the CSVs into VictoriaMetrics. Pipeline KPI rows
 have columns
 `timestamp_ms,run,name,hardware,precision,n_threads,rate,sequence,config,value` and become `pipeline_kpi` samples.
 `evaluate_pipeline.py` takes the label values and rate from the run metadata; the standalone exporter's `--hw`,
@@ -192,9 +192,10 @@ have columns
 with values assigned to the metric label keys `hardware`, `precision`, `n_threads`, `rate`, `config`, `tracker`,
 `sequence`, `class`, and `metric`. TrackEval timestamps use the newest detailed-results file modification time; score
 values are ratios in `[0, 1]`, while count metrics remain counts. The run label is the recording directory
-name. The `name` label comes from the Rerun entity path
-(for example, `/detector/inference_latency_ms` becomes `detector_inference_ms`). Counters and other non-duration scalars
-are omitted. You can also run
+name. The `name` label is the Rerun entity path with leading/trailing slashes removed and remaining slashes replaced
+with underscores, such as `detector_inference_latency_ms` or `tracker_frame_drop_count`. Previously exported CSVs use
+different names; re-evaluate and reingest existing recordings to use the updated dashboard queries. Old VictoriaMetrics
+series retain their old names. You can also run
 `uv run scripts/eval/extract_pipeline_kpi.py runs/<run-id>/recording.rrd --hw jetson-orin --precision fp16 --n-threads 1 --seq 0020 --config baseline`
 to export the CSV without importing it.
 
