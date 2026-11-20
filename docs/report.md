@@ -238,13 +238,17 @@ Each of these questions are further elaborated on in the Results section.
 
 # Results
 
+TODO: figure out the type of plots to use for each effect
+
+
 ## Platform Effect
+Fix rate=1.0 and threads=2 for comparison
 
-TODO: PC @ FP32 vs Jetson @ FP32: latencies, drops and MOT KPI deltas TODO: PC @ FP16 vs Jetson @ FP16: latencies, drops
-and MOT KPI deltas
+TODO: PC @ FP32 vs Jetson @ FP32: latencies, drops and MOT KPI deltas: e2e (+ infer & assoc) latency mean, p50, p95
+side-by-side: table or histograms?
 
-TODO: fix rate and threads for comparison or average over all? Executor Threading effect section should give clear
-guidance.
+TODO: PC @ FP16 vs Jetson @ FP16: latencies, drops and MOT KPI deltas
+
 
 ## Precision Effect
 
@@ -255,9 +259,13 @@ TODO: compare PC FP16 vs Jetson FP16 on inference/end-to-end latencies vs. HOTA,
 
 ## Executor Threading Effect
 
-TODO: compare latencies on t1 vs t2 vs t4 runs: high-level across sequences
+- [x] Latency vs. thread count: Plot p50, p95, and p99 end-to-end latency for 1/2/4 threads; facet by platform and keep
+  replay rate fixed.
+- [x] Drop rate vs. thread count: Plot dropped-frame percentage for the same configurations.
+- [x] MOT KPI bar chart: Show HOTA, IDF1, and MOTP by thread count to check whether threading changes tracking quality.
 
-TODO: compare latencies on t1 vs t2 vs t4 runs: heatmaps / percentiles over time on 0019
+![E2E Pipeline Latency: Jetson FP32 R1.0](../results/figures/executor_effect_jetson_fp32_r1.png)
+![E2E Pipeline Latency: Jetson FP32 R1.0](../results/figures/executor_effect_pc_fp32_r1.png)
 
 
 ## Load Effect
@@ -267,12 +275,12 @@ TODO: compare frame drop counts vs. replay rates vs. platform
 
 ## Load x Platform Interaction
 
-TODO: compare how load affects PC vs Jetson differently
+TODO: fix n_threads=2, compare across rates inference latency histograms (tails)
 
 
 ## Deployment Effect
 
-TODO: plots: MOT KPIs delta between PC FP32 and Jetson FP16
+TODO: plots: PC FP32 vs Jetson FP16 w/ n_threads=2, rate=1.0: compare MOT KPIs and inference/association latencies
 
 
 ## Resource Consumption
