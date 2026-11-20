@@ -1,0 +1,274 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "id": 7,
+      "panels": [],
+      "title": "End-to-End Latency",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Latency percentiles grouped by percentile; each group compares the average run-level value for thread counts 1, 2 and 4 across all sequences.",
+      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
+      "gridPos": {"h": 12, "w": 12, "x": 0, "y": 1},
+      "id": 1,
+      "options": {
+        "barWidth": 0.8,
+        "groupWidth": 0.7,
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "orientation": "vertical",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {"mode": "single", "sort": "none"},
+        "xField": "percentile"
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "label_replace((label_replace(avg by (n_threads) (quantile_over_time(0.50, pipeline_kpi{name=\"pipeline_end_to_end_latency_ms\",config=~\"^(orinnx16|rtx3090)_grid_.*\",hardware=\"jetson\",precision=~\"$precision\",rate=~\"$rate\"}[$__range])), \"percentile\", \"p50\", \"__name__\", \".*\") or label_replace(avg by (n_threads) (quantile_over_time(0.95, pipeline_kpi{name=\"pipeline_end_to_end_latency_ms\",config=~\"^(orinnx16|rtx3090)_grid_.*\",hardware=\"jetson\",precision=~\"$precision\",rate=~\"$rate\"}[$__range])), \"percentile\", \"p95\", \"__name__\", \".*\") or label_replace(avg by (n_threads) (quantile_over_time(0.99, pipeline_kpi{name=\"pipeline_end_to_end_latency_ms\",config=~\"^(orinnx16|rtx3090)_grid_.*\",hardware=\"jetson\",precision=~\"$precision\",rate=~\"$rate\"}[$__range])), \"percentile\", \"p99\", \"__name__\", \".*\")), \"thread\", \"t$1\", \"n_threads\", \"(.*)\")",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "refId": "C"
+        }
+      ],
+      "title": "Jetson ${precision}, rate=${rate}",
+      "transformations": [
+        {"id": "labelsToFields", "options": {"mode": "columns"}},
+        {"id": "groupingToMatrix", "options": {"columnField": "thread", "rowField": "percentile", "valueField": "Value"}}
+      ],
+      "type": "barchart"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Latency percentiles grouped by percentile; each group compares the average run-level value for thread counts 1, 2 and 4 across all sequences.",
+      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
+      "gridPos": {"h": 12, "w": 12, "x": 12, "y": 1},
+      "id": 5,
+      "options": {
+        "barWidth": 0.8,
+        "groupWidth": 0.7,
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "orientation": "vertical",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {"mode": "single", "sort": "none"},
+        "xField": "percentile"
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "label_replace((label_replace(avg by (n_threads) (quantile_over_time(0.50, pipeline_kpi{name=\"pipeline_end_to_end_latency_ms\",config=~\"^(orinnx16|rtx3090)_grid_.*\",hardware=\"rtx3090\",precision=~\"$precision\",rate=~\"$rate\"}[$__range])), \"percentile\", \"p50\", \"__name__\", \".*\") or label_replace(avg by (n_threads) (quantile_over_time(0.95, pipeline_kpi{name=\"pipeline_end_to_end_latency_ms\",config=~\"^(orinnx16|rtx3090)_grid_.*\",hardware=\"rtx3090\",precision=~\"$precision\",rate=~\"$rate\"}[$__range])), \"percentile\", \"p95\", \"__name__\", \".*\") or label_replace(avg by (n_threads) (quantile_over_time(0.99, pipeline_kpi{name=\"pipeline_end_to_end_latency_ms\",config=~\"^(orinnx16|rtx3090)_grid_.*\",hardware=\"rtx3090\",precision=~\"$precision\",rate=~\"$rate\"}[$__range])), \"percentile\", \"p99\", \"__name__\", \".*\")), \"thread\", \"t$1\", \"n_threads\", \"(.*)\")",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "refId": "C"
+        }
+      ],
+      "title": "PC ${precision}, rate=${rate}",
+      "transformations": [
+        {"id": "labelsToFields", "options": {"mode": "columns"}},
+        {"id": "groupingToMatrix", "options": {"columnField": "thread", "rowField": "percentile", "valueField": "Value"}}
+      ],
+      "type": "barchart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 13},
+      "id": 8,
+      "panels": [],
+      "title": "MOT Metrics",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "TrackEval sequence=COMBINED scores, macro-averaged equally across the car and pedestrian classes. Bars compare executor thread counts for each MOT metric.",
+      "fieldConfig": {"defaults": {"unit": "percentunit"}, "overrides": []},
+      "gridPos": {"h": 12, "w": 12, "x": 0, "y": 14},
+      "id": 4,
+      "options": {
+        "barWidth": 0.8,
+        "groupWidth": 0.7,
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "orientation": "vertical",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {"mode": "single", "sort": "none"},
+        "xField": "metric"
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "label_replace(avg by (n_threads, metric) (last_over_time(mot_kpi{config=~\"^(orinnx16|rtx3090)_grid_.*\",hardware=\"jetson\",precision=~\"$precision\",rate=~\"$rate\",sequence=\"COMBINED\",metric=~\"HOTA|IDF1|MOTP\"}[$__range])), \"thread\", \"t$1\", \"n_threads\", \"(.*)\")",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Jetson - COMBINED MOT metrics",
+      "transformations": [
+        {"id": "labelsToFields", "options": {"mode": "columns"}},
+        {"id": "groupingToMatrix", "options": {"columnField": "thread", "rowField": "metric", "valueField": "Value"}}
+      ],
+      "type": "barchart"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "TrackEval sequence=COMBINED scores, macro-averaged equally across the car and pedestrian classes. Bars compare executor thread counts for each MOT metric.",
+      "fieldConfig": {"defaults": {"unit": "percentunit"}, "overrides": []},
+      "gridPos": {"h": 12, "w": 12, "x": 12, "y": 14},
+      "id": 6,
+      "options": {
+        "barWidth": 0.8,
+        "groupWidth": 0.7,
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "orientation": "vertical",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {"mode": "single", "sort": "none"},
+        "xField": "metric"
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "label_replace(avg by (n_threads, metric) (last_over_time(mot_kpi{config=~\"^(orinnx16|rtx3090)_grid_.*\",hardware=\"rtx3090\",precision=~\"$precision\",rate=~\"$rate\",sequence=\"COMBINED\",metric=~\"HOTA|IDF1|MOTP\"}[$__range])), \"thread\", \"t$1\", \"n_threads\", \"(.*)\")",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "PC - COMBINED MOT metrics",
+      "transformations": [
+        {"id": "labelsToFields", "options": {"mode": "columns"}},
+        {"id": "groupingToMatrix", "options": {"columnField": "thread", "rowField": "metric", "valueField": "Value"}}
+      ],
+      "type": "barchart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 26},
+      "id": 9,
+      "panels": [],
+      "title": "Frame Drops",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Sum of the maximum cumulative detector frame-drop count for each sequence and executor setting within the selected time range. Compare complete recordings of the same sequences.",
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 12, "w": 24, "x": 0, "y": 27},
+      "id": 2,
+      "options": {
+        "barWidth": 0.8,
+        "groupWidth": 0.7,
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "orientation": "vertical",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {"mode": "single", "sort": "none"},
+        "xField": "hardware"
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "label_replace(sum by (hardware, n_threads) (max_over_time(pipeline_kpi{name=\"detector_frame_drop_count\",config=~\"^(orinnx16|rtx3090)_grid_.*\",precision=~\"$precision\",rate=~\"$rate\"}[$__range])), \"thread\", \"t$1\", \"n_threads\", \"(.*)\")",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Detector frame drops",
+      "transformations": [
+        {"id": "labelsToFields", "options": {"mode": "columns"}},
+        {"id": "groupingToMatrix", "options": {"columnField": "thread", "rowField": "hardware", "valueField": "Value"}}
+      ],
+      "type": "barchart"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+      "description": "Sum of the maximum cumulative tracker frame-drop count for each sequence and executor setting within the selected time range. Compare complete recordings of the same sequences. Tracker counts can include frames missed upstream by the detector.",
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 12, "w": 24, "x": 0, "y": 39},
+      "id": 10,
+      "options": {
+        "barWidth": 0.8,
+        "groupWidth": 0.7,
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "orientation": "vertical",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {"mode": "single", "sort": "none"},
+        "xField": "hardware"
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "victoriametrics"},
+          "editorMode": "code",
+          "expr": "label_replace(sum by (hardware, n_threads) (max_over_time(pipeline_kpi{name=\"tracker_frame_drop_count\",config=~\"^(orinnx16|rtx3090)_grid_.*\",precision=~\"$precision\",rate=~\"$rate\"}[$__range])), \"thread\", \"t$1\", \"n_threads\", \"(.*)\")",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Tracker frame drops",
+      "transformations": [
+        {"id": "labelsToFields", "options": {"mode": "columns"}},
+        {"id": "groupingToMatrix", "options": {"columnField": "thread", "rowField": "hardware", "valueField": "Value"}}
+      ],
+      "type": "barchart"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 41,
+  "tags": ["ros2", "executor", "threading"],
+  "templating": {
+    "list": [
+      {
+        "current": {"selected": true, "text": "fp32", "value": "fp32"},
+        "definition": "label_values(pipeline_kpi{config=~\"^(orinnx16|rtx3090)_grid_.*\"}, precision)",
+        "includeAll": false,
+        "label": "Precision",
+        "name": "precision",
+        "options": [],
+        "query": "label_values(pipeline_kpi{config=~\"^(orinnx16|rtx3090)_grid_.*\"}, precision)",
+        "refresh": 1,
+        "type": "query"
+      },
+      {
+        "current": {"selected": true, "text": "1.0", "value": "1.0"},
+        "definition": "label_values(pipeline_kpi{config=~\"^(orinnx16|rtx3090)_grid_.*\"}, rate)",
+        "includeAll": false,
+        "label": "Replay rate",
+        "name": "rate",
+        "options": [],
+        "query": "label_values(pipeline_kpi{config=~\"^(orinnx16|rtx3090)_grid_.*\"}, rate)",
+        "refresh": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "2026-11-18T00:00:00.000Z",
+    "to": "2026-11-21T00:00:00.000Z"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "Executor Threading Effect",
+  "uid": "ros2-executor-threading",
+  "version": 1
+}
