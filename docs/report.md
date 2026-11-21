@@ -241,27 +241,33 @@ Each of these questions are further elaborated on in the Results section.
 TODO: figure out the type of plots to use for each effect
 
 
+Aspects:
+- Latency:
+   - Metrics: e2e_{p50,p95,p99} [ms]
+- Frame drops:
+   - Metrics: total frames dropped [count]
+- MOT:
+   - Metrics: HOTA, IDF1, MOTP, IDSW, Frag [%]
+
+
 ## Platform Effect
-Fix rate=1.0 and threads=2 for comparison
+Fix: rate=1.0, threads=2; Switch: *precision*
 
-TODO: PC @ FP32 vs Jetson @ FP32: latencies, drops and MOT KPI deltas: e2e (+ infer & assoc) latency mean, p50, p95
-side-by-side: table or histograms?
-
-TODO: PC @ FP16 vs Jetson @ FP16: latencies, drops and MOT KPI deltas
-
+- [ ] bar chart per aspect: bar group by metric, bar per *platform*
+- [ ] commentary
 
 ## Precision Effect
+Fix: rate=1.0, threads=2; Switch: *platform*
 
-TODO: compare FP32 vs FP16 on inference/end-to-end latencies vs. HOTA, MOTP, IDF1, draw conclusions
-
-TODO: compare PC FP16 vs Jetson FP16 on inference/end-to-end latencies vs. HOTA, MOTP, IDF1, draw conclusions
-
+- [ ] bar chart per aspect: bar group by metric, bar per *precision*;
+- [ ] commentary
 
 ## Executor Threading Effect
+Directly answers “does the middleware concurrency model help or hurt on each platform?”
 
 - [x] Latency vs. thread count: Plot p50, p95, and p99 end-to-end latency for 1/2/4 threads; facet by platform and keep
   replay rate fixed.
-- [x] Drop rate vs. thread count: Plot dropped-frame percentage for the same configurations.
+- [x] Total frames Dropped vs. thread count: Plot dropped-frame percentage for the same configurations.
 - [x] MOT KPI bar chart: Show HOTA, IDF1, and MOTP by thread count to check whether threading changes tracking quality.
 
 ![E2E Pipeline Latency: Jetson FP32 R1.0](../results/figures/executor_effect_jetson_fp32_r1.png)
@@ -270,10 +276,17 @@ TODO: compare PC FP16 vs Jetson FP16 on inference/end-to-end latencies vs. HOTA,
 
 ## Load Effect
 
-TODO: compare frame drop counts vs. replay rates vs. platform
+Fix: precision=FP32 # higher latency model Switch: *platform*, *sequences="all"* # could select a particular sequence
+Parameter: threads
+
+Total frames dropped = sum of dropped frames across all sequences TODO: Line plot: X rate, Y total dropped frames; one
+line per thread count
 
 
 ## Load x Platform Interaction
+
+Why would there be an expected change in detector latency w/ increased rate? Doesn't make sense. Given some QoS, rates
+affect number of processed frames, not per-frame latency.
 
 TODO: fix n_threads=2, compare across rates inference latency histograms (tails)
 
