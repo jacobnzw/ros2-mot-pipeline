@@ -10,6 +10,7 @@ import yaml
 from scripts.eval.run_kitti_sequences import (
     count_mcap_frames,
     create_trackeval_gt,
+    detect_hardware,
     discover_sequences,
     identify_hardware,
     launch_command,
@@ -21,11 +22,28 @@ from scripts.eval.run_kitti_sequences import (
 
 
 class RunKittiSequencesTests(unittest.TestCase):
-    def test_identifies_jetson_and_rtx3090(self) -> None:
+    def test_identifies_jetson_and_gpu_names(self) -> None:
         self.assertEqual(identify_hardware("NVIDIA Jetson AGX Orin Developer Kit", None), "jetson")
-        self.assertEqual(identify_hardware(None, "NVIDIA GeForce RTX 3090"), "rtx3090")
-        with self.assertRaisesRegex(ValueError, "unsupported or unidentified GPU"):
-            identify_hardware(None, "NVIDIA GeForce RTX 4090")
+        self.assertEqual(identify_hardware(None, "NVIDIA GeForce RTX 3090\n"), "rtx3090")
+        self.assertEqual(identify_hardware(None, "NVIDIA GeForce RTX 4090\n"), "rtx4090")
+        self.assertEqual(identify_hardware(None, "NVIDIA A100-SXM4-80GB\n"), "a100-sxm4-80gb")
+        self.assertEqual(identify_hardware(None, "GeForce RTX 3090"), "rtx3090")
+        with self.assertRaisesRegex(ValueError, "unidentified GPU"):
+            identify_hardware(None, " \n")
+        with self.assertRaisesRegex(ValueError, "unidentified GPU"):
+            identify_hardware(None, "NVIDIA GeForce")
+        with self.assertRaisesRegex(ValueError, "single GPU"):
+            identify_hardware(None, "GPU 0\nGPU 1\n")
+
+    def test_detects_gpu_zero_without_trailing_newline(self) -> None:
+        with (
+            patch("pathlib.Path.read_text", side_effect=OSError),
+            patch("pathlib.Path.is_file", return_value=False),
+            patch("scripts.eval.run_kitti_sequences.subprocess.run") as run,
+        ):
+            run.return_value = SimpleNamespace(returncode=0, stdout="NVIDIA GeForce RTX 4090\n")
+            self.assertEqual(detect_hardware(), "rtx4090")
+        self.assertIn("--id=0", run.call_args.args[0])
 
     def test_discovers_sorted_sequences_and_requires_mcaps(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -139,13 +157,13 @@ class RunKittiSequencesTests(unittest.TestCase):
         self.assertIn("loop:=false", command)
 
     def test_starts_the_unified_monitor_for_detected_hardware(self) -> None:
-        with patch("scripts.eval.run_kitti_sequences.subprocess.Popen") as popen:
-            start_monitor("jetson", "nightly")
-
-        self.assertEqual(
-            popen.call_args.args[0],
-            ["uv", "run", "scripts/monitor.py", "--hardware", "jetson", "--config", "nightly"],
-        )
+        for hardware in ("jetson", "rtx4090"):
+            with self.subTest(hardware=hardware), patch("scripts.eval.run_kitti_sequences.subprocess.Popen") as popen:
+                start_monitor(hardware, "nightly")
+                self.assertEqual(
+                    popen.call_args.args[0],
+                    ["uv", "run", "scripts/monitor.py", "--hardware", hardware, "--config", "nightly"],
+                )
 
     def test_metadata_quotes_yaml_special_characters(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

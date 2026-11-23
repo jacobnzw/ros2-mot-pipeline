@@ -58,6 +58,7 @@ def get_gpu_stats() -> tuple[float | None, float | None, float | None, float | N
         result = subprocess.run(
             [
                 "nvidia-smi",
+                "--id=0",
                 "--query-gpu=temperature.gpu,utilization.gpu,memory.used,memory.total",
                 "--format=csv,noheader,nounits",
             ],
@@ -160,9 +161,17 @@ def main(args: argparse.Namespace) -> None:
             write_samples(writer, output_file, args, get_pc_stats)
 
 
+def hardware_label(value: str) -> str:
+    if not value or value == "pc" or value != value.lower() or any(char.isspace() for char in value):
+        raise argparse.ArgumentTypeError("must be 'jetson' or a lowercase GPU model label without spaces")
+    return value
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Log device temperatures and resource usage to CSV.")
-    parser.add_argument("--hardware", choices=("pc", "jetson"), default="pc", help="Device type to monitor.")
+    parser.add_argument(
+        "--hardware", required=True, type=hardware_label, help="GPU model label, or 'jetson' for Jetson monitoring."
+    )
     parser.add_argument(
         "--config",
         type=str,

@@ -250,11 +250,18 @@ per-sequence tasks run concurrently; use `--max-workers` to change this limit. O
 `runs/<config>/eval/pipeline/kpi_<sequence>.csv`, `runs/<config>/eval/trackers/bytetrack/`, and
 `runs/<config>/eval/tracker_kpi.csv`.
 
+For offline analysis, combine the evaluated CSVs and sequence frame counts into one Parquet file with
+`uv run python scripts/build_parquet.py --config '*_grid_*'`. The input requirements, schema, timestamp semantics, and
+plotting considerations are documented in [data/README.md](../data/README.md).
+
 While sequences run, `run_kitti_sequences.py` records device metrics to
 `runs/<config>/eval/device_metrics.csv`. The VictoriaMetrics/Grafana ingestion script imports this CSV when present.
-To run the monitor directly, use
-`uv run scripts/monitor.py --hardware pc --config <config>` or
-`uv run scripts/monitor.py --hardware jetson --config <config>`. The monitor also accepts `--out-name` and `--freq`.
+The runner passes `jetson` or a compact GPU 0 model label to both metadata and the monitor. For PC runs, it removes
+the `NVIDIA` and `GeForce` prefixes and whitespace from the name reported by `nvidia-smi` and lowercases it (for
+example, `NVIDIA GeForce RTX 3090` becomes `rtx3090`). Any non-`jetson` label uses PC monitoring, which samples GPU 0.
+To run the monitor directly for a config, pass its exact metadata hardware label, for example
+`uv run scripts/monitor.py --hardware rtx3090 --config <config>`. The monitor also accepts `--out-name` and `--freq`.
+Older runs used `rtx3090` in metadata and `pc` in device metrics; the Parquet builder normalizes those device labels.
 
 To start the VictoriaMetrics/Grafana Compose stack and ingest every pipeline KPI CSV, the tracker KPI CSV, and the
 device metrics CSV (when present) for a config:
