@@ -408,3 +408,64 @@ Export TensorRT engine to INT8, needs calibration dataset supplied via dataset_y
 ```shell
 uv run yolo export model=models/yolo/yolo11n.pt format=engine imgsz=352,1216 int8=True data={dataset_yaml}
 ```
+
+## Comparison figures
+
+Generate SVG and PNG figures from the evaluated Parquet file:
+
+```shell
+uv run python scripts/plot_results.py results/results.parquet --output-dir results/figures
+uv run python scripts/plot_results.py results/results.parquet --effect platform --output-dir results/figures
+uv run python scripts/plot_results.py results/results.parquet --effect executor --output-dir results/figures
+uv run python scripts/plot_results.py results/results.parquet --effect load --output-dir results/figures
+uv run python scripts/plot_results.py results/results.parquet --effect load-platform --output-dir results/figures
+uv run python scripts/plot_results.py results/results.parquet --effect load-platform-mot --output-dir results/figures
+uv run python scripts/plot_results.py results/results.parquet --effect load-platform-box --output-dir results/figures
+uv run python scripts/plot_results.py results/results.parquet --effect load-platform-extremes --output-dir results/figures
+uv run python scripts/plot_results.py results/results.parquet --effect load-platform-sequence-time --output-dir results/figures
+```
+
+The first command produces precision-effect figures, comparing FP32 and FP16 for each platform. The second produces
+platform-effect figures, comparing platforms for each precision. The third compares one, two, and four executor
+threads separately for each platform at FP32 precision. The fourth plots FP32 detector drops against replay rate
+for each platform and thread count. Its default uses all sequences; add `--sequence 0019` to plot one sequence
+instead, without overwriting the all-sequence plot. Use `--effect all` to generate all sets; `--sequence` then applies
+only to the load plot. The load-platform figure shows pooled detector inference latency for each platform and replay
+rate at FP32 and two threads. Its panels use common logarithmically spaced bins above 1 ms, a shared symmetric-log
+latency axis (linear below 1 ms), and a shared log-scaled percentage axis; percentages are normalized per panel.
+The load-platform MOT figure compares replay rates at FP32 and two threads, with one column per platform. Its top
+row shows HOTA, IDF1 and MOTP as percentages; its bottom row shows IDSW and Frag as mean counts per class.
+All values use ByteTrack `COMBINED` results macro-averaged across car and pedestrian, with matched sequence inventories.
+The load-platform box plot groups pooled inference samples by rate and platform after excluding the first inference
+sample from each recording. Labels in the headroom above the boxes show the maximum excluded latency for each group;
+the labels are not positioned according to those excluded values. The title reports the number excluded per box;
+if counts differ, each label includes its own count.
+The first sample means the earliest exported inference timestamp; it must be unique at millisecond resolution, or
+the plot fails rather than excluding an arbitrary sample. The exporter may use a source-frame timeline instead of
+the inference-completion timeline, so check the recording's timeline before interpreting this as logging order.
+The symmetric-log latency axis starts at zero and is linear below 5 ms. Boxes and whiskers are
+computed from the remaining millisecond values: whiskers extend to the most extreme samples within 1.5 times the
+interquartile range, and points beyond them are shown as outliers. Excluding the first inference does not establish
+that all warmup effects are gone.
+The separate load-platform extremes figures use the full samples and plot timestamps and per-sequence counts for
+samples strictly above the highest p99.5 across the six platform/rate groups, rounded up to whole milliseconds
+(at least 1 ms). Timestamps are seconds from the first observed pipeline scalar in each recording, not from the
+exact replay start. The exporter prefers the `steady_elapsed` timeline, where inference is logged after it completes,
+but can fall back to `ros2_timestamp` (the image timestamp); the Parquet file does not record which timeline was used.
+The selected source recordings should therefore be checked before interpreting elapsed times as logging times. Panel
+annotations count samples whose timestamp matches the first inference timestamp in that recording, including ties at
+millisecond resolution. Histogram bins are 0.1 seconds up to 1 second and progressively wider afterward; the
+elapsed-time axis is symmetric-log.
+The separate sequence-time figure uses the input image's `ros2_timestamp` from each original Rerun recording,
+relative to the first image header timestamp in that sequence's source MCAP. It shows position in the source
+sequence, not wall-clock elapsed replay time, which varies with replay rate. It checks the recording's inference
+samples against the Parquet timestamps and values, and requires the `steady_elapsed` and `ros2_timestamp` timelines.
+By default, recordings are read from `runs/<config>/<run>/recording.rrd` and source bags from
+`data/kitti/left_color/training/image_02_mcap/<sequence>/<sequence>.mcap`; override the roots with `--runs-dir` and
+`--sequences-dir`. This additional figure is not included in `--effect all`, which works with the Parquet file alone.
+The first three sets contain three figures at rate 1.0; the precision and platform comparisons use two executor
+threads. End-to-end
+latency percentiles are calculated over samples pooled across all sequences. Detector frame drops are summed
+across sequences after taking the maximum cumulative count per recording. MOT uses ByteTrack's `COMBINED`
+rows, macro-averaged over car and pedestrian; HOTA, IDF1 and MOTP are percentages, while IDSW and Frag are
+mean counts per class. Scores and counts use separate axes.

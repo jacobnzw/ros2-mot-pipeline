@@ -238,9 +238,6 @@ Each of these questions are further elaborated on in the Results section.
 
 # Results
 
-TODO: figure out the type of plots to use for each effect
-
-
 Aspects:
 - Latency:
    - Metrics: e2e_{p50,p95,p99} [ms]
@@ -251,51 +248,108 @@ Aspects:
 
 
 ## Platform Effect
-Fix: rate=1.0, threads=2; Switch: *precision*
+Fix: rate=1.0, threads=2, sequences="all"
 
-- [ ] bar chart per aspect: bar group by metric, bar per *platform*
+Switch: *precision*
+
+- [x] bar chart per aspect: bar group by metric, bar per *platform*
+
+![Platform Effect: Latency](../results/figures/platform_effect_latency.svg)
+![Platform Effect: Frame Drops](../results/figures/platform_effect_drops.svg)
+![Platform Effect: MOT KPIs](../results/figures/platform_effect_mot.svg)
+
+
 - [ ] commentary
 
 ## Precision Effect
-Fix: rate=1.0, threads=2; Switch: *platform*
+Fix: rate=1.0, threads=2, sequences="all"
 
-- [ ] bar chart per aspect: bar group by metric, bar per *precision*;
+Switch: *platform*
+
+- [x] bar chart per aspect: bar group by metric, bar per *precision*;
+
+![Precision Effect: Latency](../results/figures/precision_effect_latency.svg)
+![Precision Effect: Frame Drops](../results/figures/precision_effect_drops.svg)
+![Precision Effect: MOT KPIs](../results/figures/precision_effect_mot.svg)
+
+
 - [ ] commentary
 
 ## Executor Threading Effect
 Directly answers “does the middleware concurrency model help or hurt on each platform?”
 
-- [x] Latency vs. thread count: Plot p50, p95, and p99 end-to-end latency for 1/2/4 threads; facet by platform and keep
-  replay rate fixed.
-- [x] Total frames Dropped vs. thread count: Plot dropped-frame percentage for the same configurations.
-- [x] MOT KPI bar chart: Show HOTA, IDF1, and MOTP by thread count to check whether threading changes tracking quality.
+Fix: rate=1.0, sequences="all", precision=FP32
 
-![E2E Pipeline Latency: Jetson FP32 R1.0](../results/figures/executor_effect_jetson_fp32_r1.png)
-![E2E Pipeline Latency: Jetson FP32 R1.0](../results/figures/executor_effect_pc_fp32_r1.png)
+Switch: *platform*
+
+- [x] bar chart per aspect: bar group by metric, bar per *n_threads*;
+- [ ] commentary
+
+- [x] Check how values are computed
+
+![Executor Threading Effect: Latency](../results/figures/executor_effect_latency.svg)
+![Executor Threading Effect: Frame Drops](../results/figures/executor_effect_drops.svg)
+![Executor Threading Effect: MOT KPIs](../results/figures/executor_effect_mot.svg)
 
 
 ## Load Effect
 
-Fix: precision=FP32 # higher latency model Switch: *platform*, *sequences="all"* # could select a particular sequence
+Fix: precision=FP32 # higher latency model
+
+Switch: *platform*, *sequences="all"* # could select a particular sequence
+
 Parameter: threads
 
-Total frames dropped = sum of dropped frames across all sequences TODO: Line plot: X rate, Y total dropped frames; one
-line per thread count
+
+As replay rate increases, how do frame-drop rates, latency tails, and tracking metrics change on Jetson versus PC? Does
+the Jetson exhibit a steeper rise in drops or degradation in tracking quality?
+
+- [x] Line plot: X rate, Y total dropped frames; one line per thread count
+
+![Load Effect: Frame Drops](../results/figures/load_effect_drops.svg)
 
 
 ## Load x Platform Interaction
 
-Why would there be an expected change in detector latency w/ increased rate? Doesn't make sense. Given some QoS, rates
-affect number of processed frames, not per-frame latency.
+Fix: n_threads=2, precision=fp32, sequences="all"
 
-TODO: fix n_threads=2, compare across rates inference latency histograms (tails)
+
+- [x] compare across rates inference latency histograms (tails)
+
+
+Each sequence contains an extreme latency sample mostly just once. These could be explained as ONNX Runtime model warm
+up effects during the start of the recording, which is indeed supported by the fact that most of these extreme inference
+latencies occur within the first second, as shown in the following figures.
+
+![Load x Platform: Extreme Timestamps](../results/figures/load_platform_extreme_sequence_times.svg)
+![Load x Platform: Sequences w/ Extreme Latency Samples](../results/figures/load_platform_extreme_sequences.svg)
+
+Inference latency distributions are shown below as box plots with the extreme values removed (first sample of each
+sequence).
+
+![Load x Platform: Inference Latency](../results/figures/load_platform_inference_boxplot.svg)
+
+MOT KPIs shown below seem pretty much unaffected by the increasing replay rate. On Jetson, the HOTA and IDF1 slightly
+drop with increased rate, while the MOTP is essentially unaffected. With KITTI Tracking sequence being recorded at 10 Hz
+@ rate=1.0, the effect of increasing the rate to 3.0 gets us to 30 Hz, which barely satures the pipeline throuput, as
+the p95 detector latency ~35 ms translates to slightly below 30 Hz.
+
+![Load x Platform: MOT KPIs](../results/figures/load_platform_mot.svg)
+
 
 
 ## Deployment Effect
 
-TODO: plots: PC FP32 vs Jetson FP16 w/ n_threads=2, rate=1.0: compare MOT KPIs and inference/association latencies
+Fix: n_threads=2, rate=1.0, sequences="all"
+
+deployments: {PC FP32, Jetson FP16}
+
+- [ ] bar chart per aspect: bar group by metric, bar for deployment
 
 
 ## Resource Consumption
 
-TODO: summarise CPU/GPU usage, memory, and power for different configs
+I didn't really measure the resouce usage of the process itself, just the overall system stats while it was running.
+
+Makes sense: Power usage on Jetson,
+- [ ] summarise CPU/GPU usage, memory, and power for different configs
