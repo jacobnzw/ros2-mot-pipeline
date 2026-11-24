@@ -5,6 +5,10 @@
 Modular ROS2 multi-object tracking (MOT) system and an experimental / evaluation harness for measuring how the same
 pipeline behaves on a high-end PC versus a Jetson Orin NX 16GB.
 
+<p align="center">
+  <img src="results/figures/rerun_viewer_demo.jpg" alt="ReRun Viewer Demo" height="500">
+  <figcaption align="center"><em>Replaying recorded data in ReRun Viewer on KITTI Tracking sequence 0019.</em></figcaption>
+</p>
 
 
 ## 🎯 Project Goal
@@ -31,6 +35,7 @@ The study examines:
 - ✅ Full experiment grid completed on both platforms (36 configs × 21 sequences)
 - ✅ Metrics ETL pipeline → Parquet via [Apache Hamilton](https://hamilton.apache.org/)
 - ✅ [TrackEval](https://github.com/JonathonLuiten/TrackEval) integration
+- ❌ Fine-tuning MOT performance on KITTI Tracking dataset
 - ❌ Live camera drivers, multi-camera, 3D lifting, online dashboards (out of scope)
 
 This project prioritises **reproducible offline characterisation** of changes in latencies, frame drops, throughput and
