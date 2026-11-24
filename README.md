@@ -1,62 +1,83 @@
 # ROS2 Multi-Object Tracking Pipeline — PC vs Jetson
 
-**Latency & quality characterization of a production-style YOLO + ByteTrack ROS2 pipeline**
+**Latency, throughput and tracking-quality characterisation of a YOLO + ByteTrack ROS2 pipeline**
 
-This repository contains a modular ROS2 multi-object tracking (MOT) system and the experimental harness used to measure
-how moving it from a high-end PC to a Jetson affects end-to-end latency, component timings, and tracking quality.
+Modular ROS2 multi-object tracking (MOT) system and an experimental / evaluation harness for measuring how the same
+pipeline behaves on a high-end PC versus a Jetson Orin NX 16GB.
 
 
 
 ## 🎯 Project Goal
 
-Quantify the **latency distribution** and **tracking-quality impact** of running the same ROS2 MOT pipeline on:
+Quantify the **latency distributions**, **frame drops**, **throughput** and **tracking quality** of a production-style
+ROS2 MOT pipeline when moving from:
 
-- High-end PC (RTX 3090 24GB)
-- NVIDIA Jetson Orin NX 16GB (rented instance)
+- **PC** — RTX 3090 24 GB
+- **Jetson** — Orin NX 16 GB
 
-under controlled MCAP replay of a KITTI tracking sequences.
+under controlled MCAP replay of real tracking data.
 
-The work focuses on systems behaviour that matters for robotics deployment:
-- End-to-end and per-component latency (p50 / p95 / p99)
-- Detector & tracker KPIs
-- Queue / drop behaviour under `keep_last(1)` QoS
-- Effect of executor threading and input load
-- Optional precision ablation on Jetson (FP16)
+The study examines:
+
+- Platform effect (PC ↔ Jetson at matched precision)
+- Precision effect (FP32 vs FP16, especially on Jetson)
+- Executor threading (1 / 2 / 4 threads)
+- Load / replay-rate effect (1.0× / 2.0× / 3.0×)
+- Interaction of load with platform (how drops and tails scale)
+
+
+
+## 📌 Status & Scope
+
+- ✅ Full experiment grid completed on both platforms (36 configs × 21 sequences)
+- ✅ Metrics pipeline → long-form Parquet (GitHub Release)
+- ✅ TrackEval integration
+- ❌ Live camera drivers, multi-camera, 3D lifting, online dashboards (out of scope)
+
+This project prioritises **reproducible offline characterisation** of latency, drops, throughput and tracking quality
+under realistic load.
+
+
+
+## 📄 Report
+
+A detailed write-up with experimental setup, figures and analysis lives in [`docs/report.md`](docs/report.md).
 
 
 
 ## ✨ Key Features
 
 - **Modular ROS2 components**
-  - YOLO detector (ONNX Runtime, full precision)
+  - YOLO detector (ONNX Runtime, FP32 / FP16)
   - ByteTrack tracker
-  - Zero-copy intra-process communication between nodes
-- **Correct timing**
+  - Zero-copy intra-process communication
+- **Correct timing & measurement**
   - Sensor timestamp propagation
-  - Steady-clock latency & callback duration measurement
+  - Steady-clock latency and callback-duration logging
 - **Offline observability**
-  - Rerun (`.rrd`) for images, detections and time-series
-  - VictoriaMetrics + Grafana stack for latency histograms, percentiles and heatmaps
+  - Rerun (`.rrd`) recordings
+  - Metrics exported to a long-form Parquet table
+  - Plotting scripts (`scripts/plot_results.py`, `scripts/build_parquet.py`)
 - **Configurable execution**
-  - `keep_last(1)` QoS throughout
-  - MultiThreaded executor (selectable via launch argument)
-- **Reproducible experiments**
-  - Looped mcap replay of KITTI tracking sequence 0019 (10 Hz)
-  - Scripts for percentile / histogram extraction
+  - `keep_last(1)` QoS on all links
+  - Single- or Multi-Threaded executor (`n_threads` launch argument)
+- **Reproducible experiment grid**
+  - All 21 KITTI tracking training sequences
+  - Cartesian product of precision × threads × rate
 
 
 
-## 🏗️ Architecture (simplified)
+## 🏗️ ROS2 Pipeline Architecture
 
 ```text
-mcap / bag replay
+mcap replay (KITTI)
         │
         ▼
 ┌───────────────────┐
-│  Detector node    │  YOLO-ORT (full precision)
+│  Detector node    │  YOLO (FP32 / FP16)
 │  (detections)     │
 └─────────┬─────────┘
-          │ zero-copy
+          │ zero-copy + keep_last(1)
           ▼
 ┌───────────────────┐
 │  Tracker node     │  ByteTrack
@@ -64,35 +85,76 @@ mcap / bag replay
 └─────────┬─────────┘
           │
           ▼
-   Logger / Rerun / metrics
+   Rerun + metrics → Parquet
 ```
 
-All communication uses ROS2 with carefully chosen QoS. Measurements are taken with steady clocks and logged for offline
-analysis (no live online dashboard required).
+Both nodes run inside a single composable component container. Measurements use steady clocks; all analysis is offline.
+
+TODO: add diagram for evaluation pipeline.
+
+Evaluation pipeline is offline, using recorded MCAPs and metrics extraction.
+
+The VictoriaMetrics + Grafana stack has been retired to a separate branch; analysis now uses the Parquet + plotting
+scripts above.
 
 
 
-## 📊 What Was Measured
+## 📊 Experiment Grid
+
+| Axis        | Values              | Notes                          |
+|-------------|---------------------|--------------------------------|
+| Platform    | RTX 3090, Orin NX   | Same ROS2 graph                |
+| Precision   | FP32, FP16          | ONNX models                    |
+| Threads     | 1, 2, 4             | `component_container` / `_mt`  |
+| Replay rate | 1.0, 2.0, 3.0       | Multiplier on 10 Hz sequences  |
+| Sequences   | All 21 KITTI train  | One run per sequence           |
+
+→ **18 configurations × 2 platforms = 36 configs**, 21 sequences each.
+
+
+### ⏱️ Logged KPIs
 
 | Category              | Metrics                                      |
 |-----------------------|----------------------------------------------|
 | End-to-end latency    | Image stamp → track publish (p50/p95/p99)   |
 | Detector              | Inference / callback latency, detections/frame, confidence stats |
-| Tracker               | Callback duration, ID switches, fragmentation |
+| Tracker               | Callback duration, association latency |
 | Systems               | Drop rate under `keep_last(1)`, CPU/GPU load |
 | Ablations             | Executor threads, replay rate / load, (optional) FP16 on Jetson |
 
+**Tracking quality** (TrackEval)
+- HOTA, IDF1, MOTP (and the full TrackEval suite)
 
 
-## 🚀 Quick Start (high level)
+## Assets
+
+TODO: create zip of the assets
+
+- `results/results.parquet`,
+- `models/yolo`,
+
+Results are aggregated into a long-form Parquet file (≈20 MB+) published as a
+[GitHub Release asset](https://github.com/jacobnzw/ros2-mot-pipeline/releases/tag/results_data).
+
+
+
+## 🚀 Quick Start
 
 1. Build the ROS2 workspace and source it.
-2. Launch the component container with the desired executor settings.
-3. Replay the KITTI 0019 mcap (or your own bag) at the chosen rate.
-4. Collect Rerun recordings and metrics.
-5. Use the provided scripts + Grafana stack to generate latency distributions and reports.
+2. Place KITTI MCAPs under the expected data path (see launch arguments).
+3. Run a single configuration:
+   ```bash
+   ros2 launch launch/detector_test.launch.py \
+     precision:=fp16 n_threads:=2 rate:=1.0 seq:=0019 config:=my_run
+   ```
+4. Or launch the full grid via `scripts/run_grid.py` / `scripts/eval/run_kitti_sequences.py`.
+5. Build the analysis table and plots:
+   ```bash
+   uv run scripts/build_parquet.py
+   uv run scripts/plot_results.py
+   ```
 
-Detailed commands and configuration live in the `docs/` and `scripts/` directories (see repository layout below).
+Exact paths, model locations and dependency setup are documented in `docs/`.
 
 
 
@@ -100,49 +162,19 @@ Detailed commands and configuration live in the `docs/` and `scripts/` directori
 
 ```text
 ├── README.md
-├── docs/                  # Architecture notes, experiment protocol, results
-├── configs/               # Node & QoS parameters
-├── scripts/               # Replay helpers, metric extraction, analysis
-├── src/
-│   ├── detector/          # YOLO-ORT ROS2 component
-│   ├── tracker/           # ByteTrack ROS2 component
-│   └── ...
-├── results/               # Tables, figures, example recordings
-└── docker/                # VictoriaMetrics + Grafana stack (optional)
+├── docs/                       # Protocol, architecture, detailed report
+├── launch/                     # detector_test.launch.py
+├── scripts/
+│   ├── eval/                   # run_kitti_sequences.py, …
+│   ├── run_grid.py
+│   ├── build_parquet.py
+│   └── plot_results.py
+├── src/object_tracker/         # Detector + Tracker components
+├── models/yolo/                # yolo11n_fp32.onnx, yolo11n_fp16.onnx, …
+├── runs/                       # Per-config outputs (local)
+└── data/                       # KITTI mcaps / labels (not committed)
 ```
 
 
 
-## 🖥️ Platforms
-
-| Platform       | Role                          | Notes                          |
-|----------------|-------------------------------|--------------------------------|
-| PC (RTX 3090)  | Reference / development       | Full-precision ORT ~40 ms p95 |
-| Jetson         | Target evaluation             | Rented instance (cloudjetson) |
-
-The same ROS2 graph and measurement pipeline are used on both platforms so differences can be attributed to the hardware
-(and optional precision changes).
-
-
-
-## 📌 Status & Scope
-
-- ✅ Component architecture, zero-copy, timing, offline observability
-- ✅ PC baseline on KITTI 0019
-- 🔄 Jetson measurements (in progress / planned)
-- ❌ Live camera drivers, multi-camera, 3D lifting, online dashboards (explicitly out of scope for this phase)
-
-This project prioritises **reproducible offline characterisation** over a full production deployment. The results are
-intended to support a clear go/no-go decision for further embedded work and to document practical ROS2 middleware
-behaviour under realistic load.
-
-
-
-## 📄 Citation / Report
-
-A short engineering report summarising the PC vs Jetson comparison, latency distributions, tracking KPIs and lessons
-learned is (or will be) available in `docs/results.md`.
-
-
-
-*Built for learning practical ROS2 systems behaviour and for making an evidence-based decision about Jetson deployment.*
+*Built to understand the real cost of moving a ROS2 MOT pipeline from desktop to Jetson.*
