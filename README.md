@@ -23,19 +23,18 @@ The study examines:
 - Precision effect (FP32 vs FP16, especially on Jetson)
 - Executor threading (1 / 2 / 4 threads)
 - Load / replay-rate effect (1.0× / 2.0× / 3.0×)
-- Interaction of load with platform (how drops and tails scale)
 
 
 
 ## 📌 Status & Scope
 
 - ✅ Full experiment grid completed on both platforms (36 configs × 21 sequences)
-- ✅ Metrics pipeline → long-form Parquet (GitHub Release)
-- ✅ TrackEval integration
+- ✅ Metrics ETL pipeline → Parquet via [Apache Hamilton](https://hamilton.apache.org/)
+- ✅ [TrackEval](https://github.com/JonathonLuiten/TrackEval) integration
 - ❌ Live camera drivers, multi-camera, 3D lifting, online dashboards (out of scope)
 
-This project prioritises **reproducible offline characterisation** of latency, drops, throughput and tracking quality
-under realistic load.
+This project prioritises **reproducible offline characterisation** of changes in latencies, frame drops, throughput and
+tracking quality under realistic load and deployment to an embedded target.
 
 
 
@@ -47,114 +46,131 @@ A detailed write-up with experimental setup, figures and analysis lives in [`doc
 
 ## ✨ Key Features
 
-- **Modular ROS2 components**
-  - YOLO detector (ONNX Runtime, FP32 / FP16)
+- **Modular ROS2 components via `ComposableNode`**
+  - YOLO11n detector (ONNX Runtime)
   - ByteTrack tracker
   - Zero-copy intra-process communication
-- **Correct timing & measurement**
+- **Timing & measurement**
   - Sensor timestamp propagation
   - Steady-clock latency and callback-duration logging
 - **Offline observability**
-  - Rerun (`.rrd`) recordings
-  - Metrics exported to a long-form Parquet table
-  - Plotting scripts (`scripts/plot_results.py`, `scripts/build_parquet.py`)
+  - From ReRun (`.rrd`) recordings to combined long-form Parquet metrics table
 - **Configurable execution**
-  - `keep_last(1)` QoS on all links
   - Single- or Multi-Threaded executor (`n_threads` launch argument)
 - **Reproducible experiment grid**
-  - All 21 KITTI tracking training sequences
+  - All 21 KITTI Tracking training sequences
   - Cartesian product of precision × threads × rate
 
 
 
-## 🏗️ ROS2 Pipeline Architecture
+## 🏗️ Architecture
 
-```text
-mcap replay (KITTI)
-        │
-        ▼
-┌───────────────────┐
-│  Detector node    │  YOLO (FP32 / FP16)
-│  (detections)     │
-└─────────┬─────────┘
-          │ zero-copy + keep_last(1)
-          ▼
-┌───────────────────┐
-│  Tracker node     │  ByteTrack
-│  (tracks)         │
-└─────────┬─────────┘
-          │
-          ▼
-   Rerun + metrics → Parquet
+### ROS2 Pipeline
+
+Both detector and tracker wrapped in their own separate `ComposableNodeContainer` launched as `ComposableNodeContainer`
+as defined in [`launch/detector_test.launch.py`](launch/detector_test.launch.py).
+
+```mermaid
+flowchart LR
+    A["MCAP Player"] --> B["Detector node<br/>YOLO11n"]
+    B -->|"2D Detections<br/>Zero-Copy"| C["Tracker node<br/>ByteTrack"]
+    B -->|"2D Detections<br>Latencies"| D["recording.rrd"]
+    C -->|"2D Tracks<br>Latencies"| D
 ```
 
-Both nodes run inside a single composable component container. Measurements use steady clocks; all analysis is offline.
+### Evaluation Pipeline
 
-TODO: add diagram for evaluation pipeline.
+Latencies and durations are measured using steady clocks and logged as ReRun recordings, which can be viewed later in
+[ReRun Viewer](https://rerun.io/docs/getting-started/install-rerun/viewer). The recording RRD files can be transformed
+into a long-form Parquet for offline analysis using the following evaluation ETL pipeline, orchestrating a number of
+dedicated scripts (`scripts/eval`) as shown in the diagram.
 
-Evaluation pipeline is offline, using recorded MCAPs and metrics extraction.
-
-The VictoriaMetrics + Grafana stack has been retired to a separate branch; analysis now uses the Parquet + plotting
-scripts above.
+![Evaluation pipeline](results/figures/evaluation_pipeline_diagram.svg)
 
 
 
 ## 📊 Experiment Grid
 
-| Axis        | Values              | Notes                          |
-|-------------|---------------------|--------------------------------|
-| Platform    | RTX 3090, Orin NX   | Same ROS2 graph                |
-| Precision   | FP32, FP16          | ONNX models                    |
-| Threads     | 1, 2, 4             | `component_container` / `_mt`  |
-| Replay rate | 1.0, 2.0, 3.0       | Multiplier on 10 Hz sequences  |
-| Sequences   | All 21 KITTI train  | One run per sequence           |
+| Axis        | Values                   | Notes                                     |
+|-------------|--------------------------|-------------------------------------------|
+| Platform    | RTX 3090, Orin NX 16GB   | Same ROS2 graph                           |
+| Precision   | FP32, FP16               | ONNX Runtime, `ExecutionProvider_CUDA_V2` |
+| Threads     | 1, 2, 4                  | `component_container` / `*_mt`            |
+| Replay rate | 1.0, 2.0, 3.0            | Multiplier on 10 Hz sequences             |
+| Sequences   | All 21 KITTI train       | One run per sequence                      |
 
 → **18 configurations × 2 platforms = 36 configs**, 21 sequences each.
 
 
-### ⏱️ Logged KPIs
-
-| Category              | Metrics                                      |
-|-----------------------|----------------------------------------------|
-| End-to-end latency    | Image stamp → track publish (p50/p95/p99)   |
-| Detector              | Inference / callback latency, detections/frame, confidence stats |
-| Tracker               | Callback duration, association latency |
-| Systems               | Drop rate under `keep_last(1)`, CPU/GPU load |
-| Ablations             | Executor threads, replay rate / load, (optional) FP16 on Jetson |
-
-**Tracking quality** (TrackEval)
-- HOTA, IDF1, MOTP (and the full TrackEval suite)
+For Measured KPIs see [`docs/report.md`](docs/report.md).
 
 
 ## Assets
 
-TODO: create zip of the assets
+[`results/results.parquet`](https://github.com/jacobnzw/ros2-mot-pipeline/releases/tag/results_data) contains aggregated
+KPIs (pipeline, MOT, device) for the entire experiment grid and was used to produce plots in the final report.
 
-- `results/results.parquet`,
-- `models/yolo`,
 
-Results are aggregated into a long-form Parquet file (≈20 MB+) published as a
-[GitHub Release asset](https://github.com/jacobnzw/ros2-mot-pipeline/releases/tag/results_data).
 
 
 
 ## 🚀 Quick Start
 
-1. Build the ROS2 workspace and source it.
-2. Place KITTI MCAPs under the expected data path (see launch arguments).
-3. Run a single configuration:
-   ```bash
-   ros2 launch launch/detector_test.launch.py \
-     precision:=fp16 n_threads:=2 rate:=1.0 seq:=0019 config:=my_run
-   ```
-4. Or launch the full grid via `scripts/run_grid.py` / `scripts/eval/run_kitti_sequences.py`.
-5. Build the analysis table and plots:
-   ```bash
-   uv run scripts/build_parquet.py
-   uv run scripts/plot_results.py
-   ```
+### Preliminary Setup
 
-Exact paths, model locations and dependency setup are documented in `docs/`.
+1. Create an account on the [KITTI Tracking evaluation page](https://www.cvlibs.net/datasets/kitti/eval_tracking.php).
+2. From the repository root, create the download directory:
+  ```sh
+  mkdir -p data/kitti/left_color
+  ```
+3. Download both archives into `data/kitti/left_color/`:
+    - [Left color tracking images (15 GB)](https://www.cvlibs.net/datasets/kitti/user_login.php) (file name
+      `data_tracking_image_2.zip`)
+    - [Tracking training labels (9 MB)](https://www.cvlibs.net/datasets/kitti/user_login.php) (file name
+      `data_tracking_label_2.zip`)
+4. Extract both archives from the repository root:
+  ```sh
+  # This creates `training/image_02/` and `training/label_02/` under `data/kitti/left_color/`.
+  unzip data/kitti/left_color/data_tracking_image_2.zip -d data/kitti/left_color
+  unzip data/kitti/left_color/data_tracking_label_2.zip -d data/kitti/left_color
+  ```
+5. Export the YOLO11n ONNX models. Ultralytics downloads `yolo11n.pt` if it is not already available; the `mv` commands
+   give the exports the filenames selected by the launch file:
+  ```sh
+  mkdir -p models/yolo
+  # Export FP32
+  uv run yolo detect export model=yolo11n.pt format=onnx imgsz=352,1216 half=False
+  mv yolo11n.onnx models/yolo/yolo11n_fp32.onnx
+  # Export FP16
+  uv run yolo detect export model=yolo11n.pt format=onnx imgsz=352,1216 half=True
+  mv yolo11n.onnx models/yolo/yolo11n_fp16.onnx
+  ```
+6. Convert the extracted image sequences to MCAP bags, which the ROS 2 launch file expects:
+  ```sh
+  uv run scripts/kitti_to_mcap.py \
+    data/kitti/left_color/training/image_02 \
+    data/kitti/left_color/training/image_02_mcap
+  ```
+
+### Run and Evaluate
+
+1. Build the ROS 2 workspace and source it (see [ROS 2 setup](docs/ros2_cpp_setup.md)).
+2. Run one configuration:
+  ```sh
+  ros2 launch launch/detector_test.launch.py precision:=fp16 n_threads:=2 rate:=1.0 seq:=0019
+  ```
+3. Or run the experiment grid for the current platform:
+  ```sh
+  uv run scripts/eval/run_grid.py --config-basename my_grid
+  ```
+4. Evaluate the generated recordings, then build the Parquet table and plots:
+  ```sh
+  uv run scripts/eval/evaluate_pipeline.py --config 'my_grid_*'
+  uv run python scripts/build_parquet.py --config 'my_grid_*' -o results/results.parquet
+  uv run python scripts/plot_results.py results/results.parquet --output-dir results/figures
+  ```
+
+Further setup details and evaluation options are documented in `docs/`.
 
 
 
@@ -165,14 +181,14 @@ Exact paths, model locations and dependency setup are documented in `docs/`.
 ├── docs/                       # Protocol, architecture, detailed report
 ├── launch/                     # detector_test.launch.py
 ├── scripts/
-│   ├── eval/                   # run_kitti_sequences.py, …
-│   ├── run_grid.py
+│   ├── eval/                   # Evaluation pipeline
+│   ├── run_grid.py             # Run full grid
 │   ├── build_parquet.py
 │   └── plot_results.py
 ├── src/object_tracker/         # Detector + Tracker components
-├── models/yolo/                # yolo11n_fp32.onnx, yolo11n_fp16.onnx, …
-├── runs/                       # Per-config outputs (local)
-└── data/                       # KITTI mcaps / labels (not committed)
+└── (data/)                     # (created) KITTI MCAPs / labels
+├── (models/yolo/)              # (created) Ultralytics exported YOLO11n models
+├── (runs/)                     # (created) Per-config outputs
 ```
 
 
