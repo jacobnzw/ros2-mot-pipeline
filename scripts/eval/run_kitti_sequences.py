@@ -46,13 +46,21 @@ def parse_sequences(value: str) -> list[str]:
     return sequences
 
 
-# TODO: generalize suitably (don't assume rtx3090)
 def identify_hardware(device_tree_model: str | None, gpu_name: str | None) -> str:
     if device_tree_model and "jetson" in device_tree_model.lower():
         return "jetson"
-    if gpu_name and "rtx 3090" in gpu_name.lower():
-        return "rtx3090"
-    raise ValueError("unsupported or unidentified GPU; expected a Jetson or RTX 3090")
+    if gpu_name and gpu_name.strip():
+        name = gpu_name.strip()
+        if len(name.splitlines()) != 1:
+            raise ValueError("expected a single GPU name")
+        parts = name.lower().split()
+        if parts and parts[0] == "nvidia":
+            parts.pop(0)
+        if parts and parts[0] == "geforce":
+            parts.pop(0)
+        if parts:
+            return "".join(parts)
+    raise ValueError("Unsupported or unidentified GPU")
 
 
 def detect_hardware() -> str:
@@ -68,7 +76,7 @@ def detect_hardware() -> str:
         return "jetson"
 
     result = subprocess.run(
-        ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+        ["nvidia-smi", "--id=0", "--query-gpu=name", "--format=csv,noheader"],
         capture_output=True,
         text=True,
         check=False,
@@ -214,7 +222,7 @@ def start_monitor(hardware: str, config: str):
             "run",
             "scripts/monitor.py",
             "--hardware",
-            "jetson" if hardware == "jetson" else "pc",
+            hardware,
             "--config",
             config,
         ],

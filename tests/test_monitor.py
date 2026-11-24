@@ -2,22 +2,34 @@ import argparse
 import unittest
 from pathlib import Path
 
-from scripts.monitor import FIELDS, build_parser, get_jetson_stats, make_sample_row, positive_float
+from scripts.monitor import FIELDS, build_parser, get_jetson_stats, hardware_label, make_sample_row, positive_float
 
 
 class MonitorTests(unittest.TestCase):
-    def test_parser_defaults_to_pc_with_common_output_name(self) -> None:
-        args = build_parser().parse_args(["--config", "baseline"])
+    def test_parser_requires_hardware_with_common_output_name(self) -> None:
+        args = build_parser().parse_args(["--config", "baseline", "--hardware", "rtx3090"])
 
-        self.assertEqual(args.hardware, "pc")
+        self.assertEqual(args.hardware, "rtx3090")
         self.assertEqual(args.out_name, "device_metrics")
         self.assertEqual(args.freq, 1.0)
+        with self.assertRaises(SystemExit):
+            build_parser().parse_args(["--config", "baseline"])
 
     def test_frequency_must_be_finite_and_positive(self) -> None:
         self.assertEqual(positive_float("0.5"), 0.5)
         for value in ("0", "-1", "nan", "inf", "invalid"):
             with self.subTest(value=value), self.assertRaises(argparse.ArgumentTypeError):
                 positive_float(value)
+
+    def test_parser_accepts_detected_gpu_name_and_rejects_invalid_labels(self) -> None:
+        label = "rtx4090"
+        args = build_parser().parse_args(["--config", "baseline", "--hardware", label])
+        self.assertEqual(args.hardware, label)
+        row = make_sample_row("baseline", args.hardware, {}, timestamp_ms=1)
+        self.assertEqual(row["hardware"], label)
+        for value in ("", " ", "pc", "RTX3090", "rtx 3090", "gpu\nother"):
+            with self.subTest(value=value), self.assertRaises(argparse.ArgumentTypeError):
+                hardware_label(value)
 
     def test_jetson_stats_fit_the_shared_csv_schema(self) -> None:
         metrics = get_jetson_stats(
