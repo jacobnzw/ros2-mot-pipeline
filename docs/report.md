@@ -147,44 +147,36 @@ Aspects:
 
 
 ## Platform Effect
-Fix: rate=1.0, threads=2, sequences="all"
+<!-- Fix: rate=1.0, threads=2, sequences="all" Switch: *precision* -->
+<!-- bar chart per aspect: bar group by metric, bar per *platform* -->
 
-Switch: *precision*
-
-- [x] bar chart per aspect: bar group by metric, bar per *platform*
+- [ ] commentary
 
 ![Platform Effect: Latency](../results/figures/platform_effect_latency.svg)
 ![Platform Effect: Frame Drops](../results/figures/platform_effect_drops.svg)
 ![Platform Effect: MOT KPIs](../results/figures/platform_effect_mot.svg)
 
 
-- [ ] commentary
 
 ## Precision Effect
-Fix: rate=1.0, threads=2, sequences="all"
+<!-- Fix: rate=1.0, threads=2, sequences="all" Switch: *platform* -->
+<!-- bar chart per aspect: bar group by metric, bar per *precision*; -->
 
-Switch: *platform*
-
-- [x] bar chart per aspect: bar group by metric, bar per *precision*;
+- [ ] commentary
 
 ![Precision Effect: Latency](../results/figures/precision_effect_latency.svg)
 ![Precision Effect: Frame Drops](../results/figures/precision_effect_drops.svg)
 ![Precision Effect: MOT KPIs](../results/figures/precision_effect_mot.svg)
 
 
-- [ ] commentary
 
 ## Executor Threading Effect
+<!-- Fix: rate=1.0, sequences="all", precision=FP32 Switch: *platform* -->
+<!-- bar chart per aspect: bar group by metric, bar per *n_threads*; -->
+
 Directly answers “does the middleware concurrency model help or hurt on each platform?”
 
-Fix: rate=1.0, sequences="all", precision=FP32
-
-Switch: *platform*
-
-- [x] bar chart per aspect: bar group by metric, bar per *n_threads*;
 - [ ] commentary
-
-- [x] Check how values are computed
 
 ![Executor Threading Effect: Latency](../results/figures/executor_effect_latency.svg)
 ![Executor Threading Effect: Frame Drops](../results/figures/executor_effect_drops.svg)
@@ -192,28 +184,20 @@ Switch: *platform*
 
 
 ## Load Effect
-
-Fix: precision=FP32 # higher latency model
-
-Switch: *platform*, *sequences="all"* # could select a particular sequence
-
-Parameter: threads
+<!-- Fix: precision=FP32 # higher latency model Switch: *platform*, *sequences="all"* # could select a particular
+sequence Parameter: threads -->
+<!-- Line plot: X rate, Y total dropped frames; one line per thread count -->
 
 
 As replay rate increases, how do frame-drop rates, latency tails, and tracking metrics change on Jetson versus PC? Does
 the Jetson exhibit a steeper rise in drops or degradation in tracking quality?
 
-- [x] Line plot: X rate, Y total dropped frames; one line per thread count
-
 ![Load Effect: Frame Drops](../results/figures/load_effect_drops.svg)
 
 
 ## Load x Platform Interaction
-
-Fix: n_threads=2, precision=fp32, sequences="all"
-
-
-- [x] compare across rates inference latency histograms (tails)
+<!-- Fix: n_threads=2, precision=fp32, sequences="all" -->
+<!-- compare across rates inference latency histograms (tails) -->
 
 
 Each sequence contains an extreme latency sample mostly just once. These could be explained as ONNX Runtime model warm
@@ -255,5 +239,5 @@ Makes sense: Power usage on Jetson,
 
 ### Misc
 
-TODO: Changing the QoS queue depth in .keep_last() in the detections handoff to the tracker had no effect on frame drop
-counts
+TODO: No observed effect on frame drop counts when increasing the QoS queue depth > 1 in the detections handoff to the
+tracker.
