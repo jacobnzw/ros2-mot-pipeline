@@ -88,7 +88,7 @@ Key differences include:
 
 *   **Balanced Scoring**: **HOTA** decomposes into **DetA** (Detection Accuracy) and **AssA** (Association Accuracy), 
     combining them via the geometric mean: $$\text{HOTA}_{\alpha} = \sqrt{\text{DetA}_{\alpha} \cdot \text{AssA}_{\alpha}}.$$ This prevents a tracker from achieving a high score by merely detecting objects well while failing to maintain consistent IDs.
-                                                          
+                                                            
 *   **Localization**: **HOTA** incorporates localization accuracy directly into its sub-metrics, whereas **MOTA**
     requires a separate metric (**MOTP**) to measure localization, making **HOTA** a more comprehensive single-score
     evaluation.
@@ -337,6 +337,8 @@ Execution times vary due to OS scheduling and hardware load, affecting latency a
 Most frames are dropped at the start of the sequence.
 
 ![Missing Samples](../results/figures/variance_0019_0019_missing_samples.svg)
+
+- [ ] TODO: Compare with different q-depths to see if drops shift.
 
 
 
