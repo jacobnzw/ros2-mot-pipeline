@@ -1,9 +1,11 @@
 import argparse
+import contextlib
+import io
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import yaml
 
@@ -14,6 +16,7 @@ from scripts.eval.run_kitti_sequences import (
     discover_sequences,
     identify_hardware,
     launch_command,
+    main,
     parse_sequences,
     positive_float,
     start_monitor,
@@ -229,6 +232,83 @@ class RunKittiSequencesTests(unittest.TestCase):
                 "0001 image_02/0001 000000 447\n"
                 "0019 image_02/0019 000000 1059\n",
             )
+
+
+class RepeatSequenceTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.stack = contextlib.ExitStack()
+        self.addCleanup(self.stack.close)
+        module = "scripts.eval.run_kitti_sequences"
+        self.sequences = [Path("/dataset/0001"), Path("/dataset/0019")]
+        self.discover = self.stack.enter_context(patch(f"{module}.discover_sequences", return_value=self.sequences))
+        self.stack.enter_context(patch(f"{module}.detect_hardware", return_value="jetson"))
+        self.stack.enter_context(patch(f"{module}.create_trackeval_gt", return_value=Path("/eval/seqmap")))
+        self.stack.enter_context(patch(f"{module}.write_metadata"))
+        self.monitor = Mock()
+        self.start_monitor = self.stack.enter_context(patch(f"{module}.start_monitor", return_value=self.monitor))
+        self.stop_monitor = self.stack.enter_context(patch(f"{module}.stop_monitor"))
+        self.launch_run = self.stack.enter_context(
+            patch(f"{module}.subprocess.run", return_value=SimpleNamespace(returncode=0))
+        )
+        self.stack.enter_context(patch("builtins.print"))
+        self.arguments = [
+            "run_kitti_sequences.py",
+            "--kitti-root",
+            "/dataset",
+            "--n-threads",
+            "4",
+            "--precision",
+            "fp16",
+            "--config",
+            "test",
+        ]
+
+    def test_runs_each_sequence_in_order_for_default_and_repeat_count(self) -> None:
+        repository_root = Path(__file__).resolve().parents[1]
+        commands = [
+            launch_command(sequence.name, Path("/dataset"), 4, "fp16", "test", 1.0) for sequence in self.sequences
+        ]
+
+        for repeat_arguments, count in (([], 1), (["--repeat", "1"], 1), (["--repeat", "3"], 3)):
+            with self.subTest(repeat_arguments=repeat_arguments):
+                self.launch_run.reset_mock()
+                self.stop_monitor.reset_mock()
+                with patch("sys.argv", self.arguments + repeat_arguments):
+                    self.assertEqual(main(), 0)
+                self.assertEqual(
+                    self.launch_run.call_args_list,
+                    [call(command, cwd=repository_root, check=False) for command in commands for _ in range(count)],
+                )
+                self.stop_monitor.assert_called_once_with(self.monitor)
+
+    def test_rejects_invalid_repeat_counts_before_starting(self) -> None:
+        for value in ("0", "-1", "1.5", "invalid"):
+            with self.subTest(value=value), patch("sys.argv", self.arguments + ["--repeat", value]):
+                with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
+                    main()
+                self.assertEqual(error.exception.code, 2)
+        self.discover.assert_not_called()
+        self.start_monitor.assert_not_called()
+        self.launch_run.assert_not_called()
+
+    def test_failed_repeat_stops_remaining_runs_and_monitor(self) -> None:
+        self.launch_run.side_effect = [
+            SimpleNamespace(returncode=0),
+            SimpleNamespace(returncode=0),
+            SimpleNamespace(returncode=0),
+            SimpleNamespace(returncode=7),
+        ]
+        with patch("sys.argv", self.arguments + ["--repeat", "3"]):
+            self.assertEqual(main(), 7)
+        self.assertEqual(self.launch_run.call_count, 4)
+        self.assertEqual(
+            [
+                next(arg for arg in invocation.args[0] if arg.startswith("seq:="))
+                for invocation in self.launch_run.call_args_list
+            ],
+            ["seq:=0001", "seq:=0001", "seq:=0001", "seq:=0019"],
+        )
+        self.stop_monitor.assert_called_once_with(self.monitor)
 
 
 if __name__ == "__main__":

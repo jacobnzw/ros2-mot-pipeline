@@ -2,10 +2,9 @@
 
 import argparse
 import math
-import subprocess
 import os
 import signal
-
+import subprocess
 from pathlib import Path
 
 import yaml
@@ -260,6 +259,7 @@ def main() -> int:
     parser.add_argument("--config", required=True, help="Configuration name used for the runs/<config> directory")
     parser.add_argument("--rate", type=positive_float, default=1.0, help="MCAP playback rate multiplier (default: 1.0)")
     parser.add_argument("--loop", action="store_true", help="Loop MCAP playback indefinitely")
+    parser.add_argument("--repeat", type=positive_int, default=1, help="Repeat each sequence run given number of times")
     parser.add_argument(
         "--seq",
         type=parse_sequences,
@@ -319,10 +319,11 @@ def main() -> int:
                 args.loop,
             )
             print(f"\n==> Running KITTI sequence {sequence.name}", flush=True)
-            result = subprocess.run(command, cwd=repository_root, check=False)
-            if result.returncode != 0:
-                print(f"Error: launch failed for sequence {sequence.name} (exit code {result.returncode})")
-                return result.returncode
+            for _ in range(args.repeat):
+                result = subprocess.run(command, cwd=repository_root, check=False)
+                if result.returncode != 0:
+                    print(f"Error: launch failed for sequence {sequence.name} (exit code {result.returncode})")
+                    return result.returncode
     finally:
         stop_monitor(monitor_proc)
 
