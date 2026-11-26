@@ -30,6 +30,7 @@ PIPELINE_COLUMNS = [
     "config",
     "value",
 ]
+PIPELINE_TIMELINE_COLUMNS = ["ros2_timestamp_ns", "steady_elapsed_ns"]
 MOT_COLUMNS = [
     "timestamp_ms",
     "hardware",
@@ -75,6 +76,8 @@ SCHEMA = pa.schema(
         ("config", pa.string()),
         ("metric", pa.string()),
         ("value", pa.float64()),
+        ("ros2_timestamp_ns", pa.int64()),
+        ("steady_elapsed_ns", pa.int64()),
     ]
 )
 
@@ -177,6 +180,9 @@ def read_batches(path: Path, columns: list[str], *, header: bool):
             for column in ("timestamp_ms", "n_threads", "rate", "value"):
                 if column in frame:
                     frame[column] = pd.to_numeric(frame[column], errors="raise")
+            for column in PIPELINE_TIMELINE_COLUMNS:
+                if column in frame:
+                    frame[column] = pd.array(frame[column].replace("", pd.NA), dtype="Int64")
             yield frame
 
 
@@ -184,22 +190,51 @@ def write_config(writer: pq.ParquetWriter, config_dir: Path, runs_dir: Path) -> 
     metadata = load_metadata(config_dir)
     lengths = sequence_lengths(config_dir, metadata)
     pipeline_dir = config_dir / "eval" / "pipeline"
-    pipeline_files = sorted(pipeline_dir.glob("kpi_*.csv"))
-    expected = {f"kpi_{sequence}.csv" for sequence in lengths}
-    if {path.name for path in pipeline_files} != expected:
+
+    files_by_sequence: dict[str, list[Path]] = {sequence: [] for sequence in lengths}
+    for path in sorted(pipeline_dir.glob("kpi_*.csv")):
+        run_id = path.stem.removeprefix("kpi_")
+        if run_id in lengths:
+            sequence = run_id
+        else:
+            timestamp, separator, sequence = run_id.rpartition("_")
+            if not separator or not timestamp or sequence not in lengths:
+                raise ValueError(f"{path}: pipeline CSV filename does not match metadata sequences")
+        files_by_sequence[sequence].append(path)
+    if any(not paths for paths in files_by_sequence.values()):
         raise ValueError(f"{pipeline_dir}: pipeline CSV files do not match metadata sequences")
+
+    pipeline_files = []
+    for sequence, paths in files_by_sequence.items():
+        legacy_path = pipeline_dir / f"kpi_{sequence}.csv"
+        if len(paths) > 1 and legacy_path in paths:
+            with legacy_path.open(newline="", encoding="utf-8") as file:
+                first_row = next(csv.reader(file), None)
+            if first_row and len(first_row) > 1 and pipeline_dir / f"kpi_{first_row[1]}.csv" in paths:
+                print(f"Warning: ignoring duplicate legacy CSV {legacy_path}", file=sys.stderr)
+                paths.remove(legacy_path)
+        pipeline_files.extend((path, sequence) for path in paths)
+
     totals = {"pipeline": 0, "mot": 0, "hardware": 0, "sequence": 0}
-    for path in [*pipeline_files, config_dir / "eval" / "tracker_kpi.csv"]:
-        source = "pipeline" if path.parent == pipeline_dir else "mot"
-        columns = PIPELINE_COLUMNS if source == "pipeline" else MOT_COLUMNS
+    for path, sequence in [*pipeline_files, (config_dir / "eval" / "tracker_kpi.csv", None)]:
+        source = "pipeline" if sequence is not None else "mot"
+        if source == "pipeline":
+            with path.open(newline="", encoding="utf-8") as file:
+                first_row = next(csv.reader(file), [])
+            if len(first_row) == len(PIPELINE_COLUMNS):
+                columns = PIPELINE_COLUMNS
+            elif len(first_row) == len(PIPELINE_COLUMNS) + len(PIPELINE_TIMELINE_COLUMNS):
+                columns = [*PIPELINE_COLUMNS, *PIPELINE_TIMELINE_COLUMNS]
+            else:
+                raise ValueError(f"{path}: unexpected pipeline CSV column count: {len(first_row)}")
+        else:
+            columns = MOT_COLUMNS
         before = totals[source]
         runs = set()
         with closing(read_batches(path, columns, header=False)) as batches:
             for frame in batches:
                 check_labels(frame, metadata, path, source)
-                valid_sequences = (
-                    {path.stem.removeprefix("kpi_")} if source == "pipeline" else set(lengths) | {"COMBINED"}
-                )
+                valid_sequences = {sequence} if sequence is not None else set(lengths) | {"COMBINED"}
                 if not frame["sequence"].isin(valid_sequences).all():
                     raise ValueError(f"{path}: invalid sequence")
                 for name in ["run", "metric"] if source == "pipeline" else ["tracker", "class", "metric"]:
@@ -214,6 +249,8 @@ def write_config(writer: pq.ParquetWriter, config_dir: Path, runs_dir: Path) -> 
             raise ValueError(f"{path}: CSV is empty")
         if source == "pipeline" and len(runs) != 1:
             raise ValueError(f"{path}: expected exactly one run ID")
+        if sequence is not None and path.stem != f"kpi_{sequence}" and runs != {path.stem.removeprefix("kpi_")}:
+            raise ValueError(f"{path}: run ID does not match pipeline CSV filename")
 
     path = config_dir / "eval" / "device_metrics.csv"
     if path.exists():

@@ -21,6 +21,8 @@ class Sample:
     timestamp_ns: int
     name: str
     value: float
+    ros2_timestamp_ns: int | None = None
+    steady_elapsed_ns: int | None = None
 
 
 def select_timestamp_column(column_names: list[str]) -> str:
@@ -41,6 +43,10 @@ def read_latency_samples(recording_path: Path) -> list[Sample]:
         batch = chunk.to_record_batch()
         timeline_column = select_timestamp_column(batch.schema.names)
         timestamps = batch.column(timeline_column)
+        ros_timestamps = batch.column(ROS2_TIMESTAMP_COLUMN) if ROS2_TIMESTAMP_COLUMN in batch.schema.names else None
+        steady_timestamps = (
+            batch.column(STEADY_ELAPSED_COLUMN) if STEADY_ELAPSED_COLUMN in batch.schema.names else None
+        )
         values = batch.column(SCALAR_COMPONENT)
         for row_index in range(batch.num_rows):
             timestamp = timestamps[row_index]
@@ -49,8 +55,18 @@ def read_latency_samples(recording_path: Path) -> list[Sample]:
                 continue
 
             timestamp_ns = timestamp.value
+            ros_timestamp_ns = (
+                ros_timestamps[row_index].value
+                if ros_timestamps is not None and ros_timestamps[row_index].is_valid
+                else None
+            )
+            steady_elapsed_ns = (
+                steady_timestamps[row_index].value
+                if steady_timestamps is not None and steady_timestamps[row_index].is_valid
+                else None
+            )
             samples.extend(
-                Sample(timestamp_ns, name, float(value))
+                Sample(timestamp_ns, name, float(value), ros_timestamp_ns, steady_elapsed_ns)
                 for value in row_values
                 if value is not None and math.isfinite(float(value))
             )
@@ -100,6 +116,8 @@ def write_csv(
                     sequence,
                     config,
                     sample.value,
+                    "" if sample.ros2_timestamp_ns is None else sample.ros2_timestamp_ns,
+                    "" if sample.steady_elapsed_ns is None else sample.steady_elapsed_ns,
                 )
             )
 

@@ -235,6 +235,9 @@ whole config:
 uv run scripts/eval/evaluate_pipeline.py --config <config>
 ```
 
+The detector launch passes a five-second startup delay to bag playback, allowing time for pipeline initialization.
+This delay does not guarantee that the pipeline is ready.
+
 `--config` also accepts a quoted glob pattern matched against directory names in `runs/`, for example
 `--config 'rtx3090*'`. Every matching directory that contains `metadata.yaml` is evaluated in turn. If a config fails,
 the remaining ones still run, a summary is printed, and the exit code is non-zero.
@@ -244,15 +247,37 @@ Alternatively, pass an explicit metadata path with `--metadata runs/<config>/met
 `run_kitti_sequences.py --config <config>` creates `runs/<config>/eval/label_02` as a symlink to the configured KITTI
 labels and generates `runs/<config>/eval/evaluate_tracking.seqmap.training`. It counts image messages in each selected
 MCAP for the seqmap's frame count and records both paths in `metadata.yaml`. The pipeline runs one parallel task per
-recording to extract its pipeline KPI CSV and ByteTrack prediction, evaluates the selected prediction sequences once
-with TrackEval using the config-specific `trackeval_gt` folder, then exports tracker KPIs. By default, at most two
-per-sequence tasks run concurrently; use `--max-workers` to change this limit. Outputs are written to
-`runs/<config>/eval/pipeline/kpi_<sequence>.csv`, `runs/<config>/eval/trackers/bytetrack/`, and
+recording to extract its pipeline KPI CSV. For repeated sequences, it extracts the ByteTrack prediction from the latest
+recording by timestamp and evaluates each sequence once with TrackEval using the config-specific `trackeval_gt` folder.
+It then exports tracker KPIs. Use `--max-workers` to change the number of concurrent tasks. Outputs are written to
+`runs/<config>/eval/pipeline/kpi_<datetime>_<sequence>.csv`, `runs/<config>/eval/trackers/bytetrack/`, and
 `runs/<config>/eval/tracker_kpi.csv`.
 
 For offline analysis, combine the evaluated CSVs and sequence frame counts into one Parquet file with
 `uv run python scripts/build_parquet.py --config '*_grid_*'`. The input requirements, schema, timestamp semantics, and
 plotting considerations are documented in [data/README.md](../data/README.md).
+The Parquet builder accepts both per-run CSVs and legacy `kpi_<sequence>.csv` files; it ignores a legacy file if a
+per-run CSV for the same recording exists. Evaluation leaves legacy CSVs in place. The VictoriaMetrics ingestion
+script imports every matching CSV, so remove any duplicate legacy files before ingestion.
+
+For repeated runs of a single sequence, plot per-frame latency and missing end-to-end samples with:
+
+```shell
+uv run scripts/plot_sequence_variability.py results/variance_0019_results.parquet \
+  --config variance_0019 --sequence 0019 --fps 10
+```
+
+The script uses the sequence frame count and reconstructs source timestamps using `kitti_to_mcap.py`'s formula.
+`--fps` is the MCAP generation FPS, not the playback rate. The stacked latency plot shows one column per source frame:
+stack height is the number of runs with a sample, and colors show binned latency. Samples are sorted by latency within
+each column, so rows do not represent individual runs; gray cells indicate missing samples. The plot shows the full
+sequence and a detail of its first ten seconds. Histogram bars sum missing samples across runs in five-second
+source-time bins (`--bin-seconds` changes the bin width). Missing samples do not establish where or why a frame was
+lost. Ensure the MCAP was generated with the specified FPS and inspect startup and shutdown effects separately.
+
+The Parquet file must include the original `ros2_timestamp_ns` timeline. CSVs exported before that field was added
+need to be re-exported from their Rerun recordings and the Parquet file rebuilt; legacy CSVs remain readable but their
+timeline fields are null. Re-running evaluation overwrites its existing per-run CSVs and tracker results.
 
 While sequences run, `run_kitti_sequences.py` records device metrics to
 `runs/<config>/eval/device_metrics.csv`. The VictoriaMetrics/Grafana ingestion script imports this CSV when present.
