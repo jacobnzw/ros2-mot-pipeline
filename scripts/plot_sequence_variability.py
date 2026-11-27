@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot end-to-end latency and missing samples across repeated sequence runs."""
+"""Plot end-to-end latency and detector frame drops across repeated sequence runs."""
 
 import argparse
 import math
@@ -14,12 +14,13 @@ from matplotlib.ticker import MaxNLocator
 
 ROOT = Path(__file__).resolve().parents[1]
 LATENCY = "pipeline_end_to_end_latency_ms"
+DETECTOR_DROPS = "detector_frame_drop_count"
 NANOSECONDS = 1_000_000_000
 
 
 def variability_data(
     frame: pd.DataFrame, config: str, sequence: str, fps: float
-) -> tuple[pd.DataFrame, pd.DataFrame, int]:
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, int]:
     if not math.isfinite(fps) or fps <= 0:
         raise ValueError("source FPS must be finite and greater than zero")
     if "ros2_timestamp_ns" not in frame:
@@ -54,44 +55,52 @@ def variability_data(
     if not latency["ros2_timestamp_ns"].isin(expected).all():
         raise ValueError(f"{config}/{sequence}: source timestamps do not match frame count and FPS")
 
-    frequencies = latency.groupby("ros2_timestamp_ns")["run"].nunique()
-    counts = pd.DataFrame({"ros2_timestamp_ns": expected})
-    counts["observed_runs"] = counts["ros2_timestamp_ns"].map(frequencies).fillna(0).astype(int)
-    counts["missing_runs"] = run_count - counts["observed_runs"]
-    counts["source_seconds"] = counts["ros2_timestamp_ns"] / NANOSECONDS
-    latency["observed_runs"] = latency["ros2_timestamp_ns"].map(frequencies).astype(int)
-    latency["source_seconds"] = latency["ros2_timestamp_ns"] / NANOSECONDS
-    return latency, counts, run_count
+    drop_samples = pipeline[pipeline["metric"] == DETECTOR_DROPS]
+    missing_drop_runs = sorted(set(pipeline["run"]) - set(drop_samples["run"]))
+    if missing_drop_runs:
+        raise ValueError(
+            f"{config}/{sequence}: missing {DETECTOR_DROPS} samples for run(s): {', '.join(missing_drop_runs)}"
+        )
+    drop_values = drop_samples["value"]
+    if drop_values.isna().any() or not drop_values.map(math.isfinite).all():
+        raise ValueError(f"{config}/{sequence}: non-finite {DETECTOR_DROPS} samples")
+    if (drop_values < 0).any() or (drop_values % 1 != 0).any():
+        raise ValueError(f"{config}/{sequence}: {DETECTOR_DROPS} samples must be non-negative integer counts")
+    drop_totals = (
+        drop_samples.groupby("run", as_index=False)["value"]
+        .max()
+        .rename(columns={"value": "total_dropped_frames"})
+        .sort_values("run", ignore_index=True)
+    )
+    drop_totals["total_dropped_frames"] = drop_totals["total_dropped_frames"].astype(int)
+    timeline = pd.DataFrame({"ros2_timestamp_ns": expected})
+    return latency, timeline, drop_totals, run_count
 
 
-def stacked_latency_matrix(latency: pd.DataFrame, counts: pd.DataFrame, run_count: int) -> np.ndarray:
-    matrix = np.full((run_count, len(counts)), np.nan)
-    frame_indices = {timestamp: index for index, timestamp in enumerate(counts["ros2_timestamp_ns"])}
+def stacked_latency_matrix(latency: pd.DataFrame, timeline: pd.DataFrame, run_count: int) -> np.ndarray:
+    matrix = np.full((run_count, len(timeline)), np.nan)
+    frame_indices = {timestamp: index for index, timestamp in enumerate(timeline["ros2_timestamp_ns"])}
     for timestamp, group in latency.groupby("ros2_timestamp_ns"):
         values = np.sort(group["value"].to_numpy(dtype=float))
         matrix[: len(values), frame_indices[timestamp]] = values
     return matrix
 
 
-def plot_variability(
-    frame: pd.DataFrame, config: str, sequence: str, fps: float, bin_seconds: float, output_dir: Path
-) -> list[Path]:
-    if not math.isfinite(bin_seconds) or bin_seconds <= 0:
-        raise ValueError("histogram bin width must be finite and greater than zero")
+def plot_variability(frame: pd.DataFrame, config: str, sequence: str, fps: float, output_dir: Path) -> list[Path]:
     if any(not re.fullmatch(r"[A-Za-z0-9_.-]+", part) or part in {".", ".."} for part in (config, sequence)):
         raise ValueError("config and sequence must be single safe path components")
-    latency, counts, run_count = variability_data(frame, config, sequence, fps)
+    latency, timeline, drop_totals, run_count = variability_data(frame, config, sequence, fps)
     output_dir.mkdir(parents=True, exist_ok=True)
     paths = []
 
-    matrix = stacked_latency_matrix(latency, counts, run_count)
+    matrix = stacked_latency_matrix(latency, timeline, run_count)
     edges = [0, 17, 20, 25, 30, 35, 40, 50, 75, 100, 250, 500, 1000, 1600]
     edges[0] = min(0.0, float(latency["value"].min()))
     edges[-1] = max(1600.0, float(latency["value"].max()))
     colors = plt.get_cmap("viridis", len(edges) - 1).with_extremes(bad="#e6e6e6")
     norm = BoundaryNorm(edges, colors.N, clip=True)
     figure, axes = plt.subplots(2, 1, figsize=(17, 7), layout="constrained")
-    extent = (-0.5 / fps, (len(counts) - 0.5) / fps, 0.5, run_count + 0.5)
+    extent = (-0.5 / fps, (len(timeline) - 0.5) / fps, 0.5, run_count + 0.5)
     for axis in axes:
         image = axis.imshow(
             matrix, origin="lower", aspect="auto", interpolation="nearest", extent=extent, cmap=colors, norm=norm
@@ -101,7 +110,7 @@ def plot_variability(
         axis.yaxis.set_major_locator(MaxNLocator(integer=True, nbins=min(run_count, 10)))
     axes[0].set_title("Full sequence")
     axes[0].set_xlim(extent[0], extent[1])
-    detail_frames = max(1, math.ceil(min(10 * fps, len(counts))))
+    detail_frames = max(1, math.ceil(min(10 * fps, len(timeline))))
     detail_end = (detail_frames - 0.5) / fps
     axes[1].set_title(f"Detail: first {detail_frames / fps:g} seconds")
     axes[1].set_xlim(extent[0], detail_end)
@@ -124,19 +133,17 @@ def plot_variability(
         paths.append(path)
     plt.close(figure)
 
-    figure, axis = plt.subplots(figsize=(12, 4))
-    end = counts["source_seconds"].iloc[-1]
-    bins = np.arange(math.floor(end / bin_seconds) + 2) * bin_seconds
-    axis.hist(counts["source_seconds"], bins=bins, weights=counts["missing_runs"], edgecolor="black")
+    figure, axis = plt.subplots(figsize=(8, 4))
+    axis.hist(drop_totals["total_dropped_frames"], bins="auto", edgecolor="black")
     axis.set(
-        title=f"Sequence {sequence}: missing end-to-end samples ({run_count} runs)",
-        xlabel="Source sequence time [s]",
-        ylabel=f"Missing samples per {bin_seconds:g} s",
+        title=f"Sequence {sequence}: total detector frame drops ({run_count} runs)",
+        xlabel="Cumulative detector frames dropped per run",
+        ylabel="Runs",
     )
     axis.yaxis.set_major_locator(MaxNLocator(integer=True))
     figure.tight_layout()
     for extension in ("svg", "png"):
-        path = output_dir / f"{config}_missing_samples.{extension}"
+        path = output_dir / f"{config}_total_dropped_frames.{extension}"
         figure.savefig(path, bbox_inches="tight", dpi=200)
         paths.append(path)
     plt.close(figure)
@@ -149,12 +156,11 @@ def main() -> None:
     parser.add_argument("--config", required=True, help="Configuration name")
     parser.add_argument("--sequence", required=True, help="Sequence ID")
     parser.add_argument("--fps", type=float, default=10.0, help="MCAP generation FPS, not playback rate (default: 10)")
-    parser.add_argument("--bin-seconds", type=float, default=5.0, help="Missing-sample histogram bin width")
     parser.add_argument("--output-dir", type=Path, default=ROOT / "results" / "figures")
     args = parser.parse_args()
     try:
         frame = pd.read_parquet(args.parquet, dtype_backend="numpy_nullable")
-        for path in plot_variability(frame, args.config, args.sequence, args.fps, args.bin_seconds, args.output_dir):
+        for path in plot_variability(frame, args.config, args.sequence, args.fps, args.output_dir):
             print(f"Wrote {path}")
     except (OSError, ValueError) as error:
         parser.error(str(error))

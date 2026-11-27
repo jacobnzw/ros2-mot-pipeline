@@ -19,6 +19,7 @@ from scripts.eval.run_kitti_sequences import (
     main,
     parse_sequences,
     positive_float,
+    positive_int,
     start_monitor,
     write_metadata,
 )
@@ -113,6 +114,7 @@ class RunKittiSequencesTests(unittest.TestCase):
                 trackeval_gt,
                 trackeval_seqmap,
                 4,
+                3,
                 "rtx3090",
                 "fp16",
                 "nightly-run",
@@ -124,6 +126,7 @@ class RunKittiSequencesTests(unittest.TestCase):
                 yaml.safe_load(metadata.read_text(encoding="utf-8")),
                 {
                     "n_threads": 4,
+                    "q_depth": 3,
                     "hardware": "rtx3090",
                     "precision": "fp16",
                     "rate": 1.5,
@@ -139,12 +142,13 @@ class RunKittiSequencesTests(unittest.TestCase):
 
     def test_builds_ros_launch_command_with_all_run_arguments(self) -> None:
         self.assertEqual(
-            launch_command("0019", Path("/dataset/mcaps"), 4, "fp16", "nightly", 1.5, True),
+            launch_command("0019", Path("/dataset/mcaps"), 4, "fp16", "nightly", 1.5, True, 3),
             [
                 "ros2",
                 "launch",
                 "launch/detector_test.launch.py",
                 "n_threads:=4",
+                "q_depth:=3",
                 "seq:=0019",
                 "label:=nightly",
                 "precision:=fp16",
@@ -158,6 +162,13 @@ class RunKittiSequencesTests(unittest.TestCase):
         command = launch_command("0019", Path("/dataset/mcaps"), 1, "fp32", "baseline", 1.0)
 
         self.assertIn("loop:=false", command)
+        self.assertIn("q_depth:=1", command)
+
+    def test_queue_depth_must_be_positive(self) -> None:
+        self.assertEqual(positive_int("3"), 3)
+        for value in ("0", "-1", "not-an-integer"):
+            with self.subTest(value=value), self.assertRaises(argparse.ArgumentTypeError):
+                positive_int(value)
 
     def test_starts_the_unified_monitor_for_detected_hardware(self) -> None:
         for hardware in ("jetson", "rtx4090"):
@@ -177,6 +188,7 @@ class RunKittiSequencesTests(unittest.TestCase):
                 Path("/dataset/training/label_02"),
                 Path("/runs/nightly/eval"),
                 Path("/runs/nightly/eval/evaluate_tracking.seqmap.training"),
+                1,
                 1,
                 "jetson",
                 "fp16",

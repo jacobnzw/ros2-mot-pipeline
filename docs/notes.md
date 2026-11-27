@@ -157,7 +157,7 @@ Key differences include:
 
 *   **Balanced Scoring**: **HOTA** decomposes into **DetA** (Detection Accuracy) and **AssA** (Association Accuracy), 
     combining them via the geometric mean: $$\text{HOTA}_{\alpha} = \sqrt{\text{DetA}_{\alpha} \cdot \text{AssA}_{\alpha}}.$$ This prevents a tracker from achieving a high score by merely detecting objects well while failing to maintain consistent IDs.
-              
+                                        
 *   **Localization**: **HOTA** incorporates localization accuracy directly into its sub-metrics, whereas **MOTA**
     requires a separate metric (**MOTP**) to measure localization, making **HOTA** a more comprehensive single-score
     evaluation.
@@ -414,6 +414,10 @@ The concurrency rules
   Callbacks belonging to different groups may always run in parallel (if the executor has enough threads).
 
 ## Ingress Policies
+
+This is what the author of [takt-vision](https://github.com/GBR-RL/takt-vision/blob/main/src/pipeline/hand_off.cpp)
+implemented for handling incoming frames.
+
 Which to use depends on your goal:
 - strict delivery (use block),
 - bounded latency with some loss (drop-newest), or
@@ -436,13 +440,82 @@ Keep only the most recent frame(s). Older buffered frames are discarded in favor
 systems where stale frames are useless.
 
 
-### Overload Example: Slow Detector
-> A 30 fps camera feeding a detector that manages only ~25 fps.
+### DDS QoS and Ingress Policies
+
+The DDS spec (and therefore ROS 2) gives you exactly two options for subscriber history:
+
+| History | Behavior when queue is full |
+|---------|----------------------------|
+| `KEEP_LAST depth N` | **Drop-oldest** — the newest sample evicts the oldest. Always. |
+| `KEEP_ALL` | No eviction (queue grows until resource limits) |
+
+That's it. There is no DROP_NEWEST option, and no backpressure signal from subscriber to publisher.
+
+
+#### What you can do
+
+"Latest wins" (drop-oldest): This is exactly what `KEEP_LAST` depth 1 gives you. The newest frame replaces whatever was
+queued. This is the idiomatic choice for perception pipelines:
+
+```cpp
+auto qos = rclcpp::SensorDataQoS();
+qos.keep_last(1);  // only ever hold the latest frame
+```
+
+"Drop-newest": Not available at the QoS/DDS level. You'd have to implement it yourself in the callback:
+
+```cpp
+// Subscriber with KEEP_ALL (or large depth) — you manage eviction
+void callback(sensor_msgs::msg::CompressedImage::UniquePtr msg) {
+    if (my_queue_.full()) {
+        // Drop the NEWEST (just arrived) — keep what's already queued
+        return;  // or log a drop counter
+    }
+    my_queue_.push(std::move(msg));
+}
+```
+
+This is unusual for sensor data (you'd rarely want stale frames over fresh ones), but it's possible.
+
+"Backpressure the publisher": Not possible in DDS. The publisher has no visibility into the subscriber's queue state.
+The only "backpressure" that exists is writer-side: if the publisher's own KEEP_LAST history cache is full (readers
+haven't acked), write() blocks. But that's the writer protecting itself, not the subscriber signaling anything.
+
+The Adaptive Bridge paper you might find relevant describes exactly this problem — a slow RELIABLE subscriber causes the
+writer's pool to fill, blocking the publisher for all readers. Their solution is an application-level proxy that
+rate-limits, not a DDS-native mechanism. ⁠
+
+| Desired behavior | Available? | How |
+|-----------------|-----------|-----|
+| Drop-oldest (latest wins) | ✅ | `KEEP_LAST depth N` (N=1 for "always latest") |
+| Drop-newest | ❌ | DIY in callback |
+| Backpressure publisher | ❌ | Not a DDS/ROS 2 feature; requires app-level proxy |
+| Unbounded queue | ✅ | `KEEP_ALL` (with `max_samples` resource limit as safety valve) |
+
+The DDS design philosophy here is deliberately minimal: the subscriber is a passive consumer, and the only "policy" it
+expresses is how many samples to retain. Anything beyond that is application logic.
+
 
 ```mermaid
 flowchart LR
-  P["producer</br> (sensor)"] -->|frame| Queue -->|frame| R["consumer</br>(detector)"]
+    subgraph "Publisher Node"
+        APP_P["App: publish(msg)"] --> WH["Writer History<br/>(producer queue)<br/>KEEP_LAST N / <br/> KEEP_ALL"]
+    end
+
+    subgraph "DDS Transport (UDP / SHM)"
+        WH -->|"send sample"| RH
+        RH -.->|"ACKNACK<br/>(RELIABLE only)"| WH
+    end
+
+    subgraph "Subscriber Node"
+        RH["Reader History<br/>(consumer queue)<br/>KEEP_LAST N /<br/> KEEP_ALL"] --> APP_S["App: callback(msg)"]
+    end   
 ```
+
+
+
+### Overload Example: Slow Detector
+> A 30 fps camera feeding a detector that manages only ~25 fps.
 
 The choice of ingress policy doesn’t “speed up” the detector; it controls queuing, frame loss, and backpressure, which
 change the observed end-to-end latency distribution and freshness of outputs. What the ingress policy changes is which

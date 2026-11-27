@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from launch.actions import DeclareLaunchArgument, EmitEvent, ExecuteProcess, OpaqueFunction, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
@@ -7,6 +8,7 @@ from launch.events import Shutdown
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, TextSubstitution
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
+from launch_ros.parameter_descriptions import ParameterValue
 
 from launch import LaunchContext, LaunchDescription
 
@@ -15,6 +17,7 @@ log_input_image = LaunchConfiguration("log_input_image")
 log_detections = LaunchConfiguration("log_detections")
 log_tracks = LaunchConfiguration("log_tracks")
 n_threads = LaunchConfiguration("n_threads")
+q_depth = LaunchConfiguration("q_depth")
 loop = LaunchConfiguration("loop")
 seq = LaunchConfiguration("seq")
 kitti_root = LaunchConfiguration("kitti_root")
@@ -36,14 +39,51 @@ def generate_launch_description():
     def create_bag_player(context: LaunchContext) -> list[ExecuteProcess | RegisterEventHandler]:
         sequence = seq.perform(context)
         mcap_path = Path(kitti_root.perform(context)).expanduser() / sequence / f"{sequence}.mcap"
-        command = ["ros2", "bag", "play", str(mcap_path), "--clock", "--rate", rate.perform(context), "--delay", "5.0"]
+        try:
+            queue_depth = int(q_depth.perform(context))
+        except ValueError as exc:
+            raise ValueError("q_depth must be a positive integer") from exc
+        if queue_depth < 1:
+            raise ValueError("q_depth must be a positive integer")
+
+        qos_directory = TemporaryDirectory(prefix="ros2-mot-qos-")
+        qos_override_path = Path(qos_directory.name) / "image_qos.yaml"
+        qos_override_path.write_text(
+            '"/camera/image_raw/compressed":\n'
+            "  history: keep_last\n"
+            f"  depth: {queue_depth}\n"
+            "  reliability: best_effort\n"
+            "  durability: volatile\n",
+            encoding="utf-8",
+        )
+        command = [
+            "ros2",
+            "bag",
+            "play",
+            str(mcap_path),
+            "--qos-profile-overrides-path",
+            str(qos_override_path),
+            "--clock",
+            "--rate",
+            rate.perform(context),
+            "--delay",
+            "5.0",
+        ]
         if loop.perform(context).lower() == "true":
             command.append("--loop")
         bag_player = ExecuteProcess(cmd=command, name="kitty_player", output="screen")
+
+        def cleanup_qos_override(_: LaunchContext) -> list:
+            qos_directory.cleanup()
+            return []
+
         shutdown_on_bag_exit = RegisterEventHandler(
             OnProcessExit(
                 target_action=bag_player,
-                on_exit=[EmitEvent(event=Shutdown(reason="MCAP playback finished"))],
+                on_exit=[
+                    OpaqueFunction(function=cleanup_qos_override),
+                    EmitEvent(event=Shutdown(reason="MCAP playback finished")),
+                ],
             )
         )
         return [bag_player, shutdown_on_bag_exit]
@@ -65,6 +105,7 @@ def generate_launch_description():
                         "model_path": str(model_path),
                         "image_topic": "/camera/image_raw/compressed",
                         "detection_topic": "/detections",
+                        "q_depth": ParameterValue(q_depth, value_type=int),
                         "log_input_image": log_input_image,
                         "log_detections": log_detections,
                         "recording_path": recording_path,
@@ -147,6 +188,11 @@ def generate_launch_description():
                 "n_threads",
                 default_value="1",
                 description="Number of threads to use. If > 1 multi-threaded executor is used.",
+            ),
+            DeclareLaunchArgument(
+                "q_depth",
+                default_value="1",
+                description="Keep-last depth for MCAP image publishing and detector image input.",
             ),
             DeclareLaunchArgument(
                 "precision",

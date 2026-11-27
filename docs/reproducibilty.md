@@ -260,7 +260,7 @@ The Parquet builder accepts both per-run CSVs and legacy `kpi_<sequence>.csv` fi
 per-run CSV for the same recording exists. Evaluation leaves legacy CSVs in place. The VictoriaMetrics ingestion
 script imports every matching CSV, so remove any duplicate legacy files before ingestion.
 
-For repeated runs of a single sequence, plot per-frame latency and missing end-to-end samples with:
+For repeated runs of a single sequence, plot per-frame latency and per-run detector frame drops with:
 
 ```shell
 uv run scripts/plot_sequence_variability.py results/variance_0019_results.parquet \
@@ -271,9 +271,10 @@ The script uses the sequence frame count and reconstructs source timestamps usin
 `--fps` is the MCAP generation FPS, not the playback rate. The stacked latency plot shows one column per source frame:
 stack height is the number of runs with a sample, and colors show binned latency. Samples are sorted by latency within
 each column, so rows do not represent individual runs; gray cells indicate missing samples. The plot shows the full
-sequence and a detail of its first ten seconds. Histogram bars sum missing samples across runs in five-second
-source-time bins (`--bin-seconds` changes the bin width). Missing samples do not establish where or why a frame was
-lost. Ensure the MCAP was generated with the specified FPS and inspect startup and shutdown effects separately.
+sequence and a detail of its first ten seconds. The accompanying histogram uses the maximum cumulative
+`detector_frame_drop_count` from each run, giving one observation per run (10 observations for 10 runs). It summarizes
+the total detector drops per run, not their position or cause. Ensure the MCAP was generated with the specified FPS and
+inspect startup and shutdown effects separately.
 
 The Parquet file must include the original `ros2_timestamp_ns` timeline. CSVs exported before that field was added
 need to be re-exported from their Rerun recordings and the Parquet file rebuilt; legacy CSVs remain readable but their

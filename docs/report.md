@@ -88,7 +88,7 @@ Key differences include:
 
 *   **Balanced Scoring**: **HOTA** decomposes into **DetA** (Detection Accuracy) and **AssA** (Association Accuracy), 
     combining them via the geometric mean: $$\text{HOTA}_{\alpha} = \sqrt{\text{DetA}_{\alpha} \cdot \text{AssA}_{\alpha}}.$$ This prevents a tracker from achieving a high score by merely detecting objects well while failing to maintain consistent IDs.
-                                                                
+                                                                                              
 *   **Localization**: **HOTA** incorporates localization accuracy directly into its sub-metrics, whereas **MOTA**
     requires a separate metric (**MOTP**) to measure localization, making **HOTA** a more comprehensive single-score
     evaluation.
@@ -178,6 +178,75 @@ Most in-memory ORT and provider state is lost when the process (or session/conte
 again incur first-run costs. Disk-backed compilation or engine caches, if explicitly enabled, and the OS page cache may
 survive process exit; they disappear when cleared or evicted. A machine reboot clears volatile memory and GPU state, but
 not persistent disk caches.
+
+
+## QoS: Bag Player --> Detector 
+
+```shell
+> ros2 topic info /camera/image_raw/compressed --verbose                                      
+Type: sensor_msgs/msg/CompressedImage
+
+Publisher count: 1
+
+Node name: rosbag2_player
+Node namespace: /
+Topic type: sensor_msgs/msg/CompressedImage
+Topic type hash: RIHS01_15640771531571185e2efc8a100baf923961a4d15d5569652e6cb6691e8e371a
+Endpoint type: PUBLISHER
+GID: 01.0f.58.b3.0e.eb.be.8d.00.00.00.00.00.00.14.03
+QoS profile:
+  Reliability: RELIABLE
+  History (Depth): UNKNOWN
+  Durability: VOLATILE
+  Lifespan: Infinite
+  Deadline: Infinite
+  Liveliness: AUTOMATIC
+  Liveliness lease duration: Infinite
+```
+
+The `History (Depth): UNKNOWN` means the publisher's history policy is `KEEP_ALL`, so that every sample it publishes is
+retained in the writer's history until all matched readers have received it.
+
+
+## What each means in isolation
+
+**RELIABLE** (publisher side): The DDS writer keeps samples in its history cache, periodically announces what it has via
+`HEARTBEAT` submessages, and retransmits whatever the reader reports missing via `ACKNACK`. It's analogous to TCP —
+delivery is confirmed, lost fragments are resent. Cost: extra traffic, latency spikes under loss, and a bounded window
+(if the cache overflows with `KEEP_LAST depth 10`, old samples are evicted and *can* be lost despite "reliable").
+
+**BEST_EFFORT** (publisher side): The writer sends each sample once and forgets it. No heartbeats, no retransmissions,
+no tracking of what the reader received. If a UDP fragment is lost, the whole sample is dropped at the reader. Analogous
+to UDP. Lower latency, lower overhead, but silent loss.
+
+## What happens with RELIABLE pub → BEST_EFFORT sub
+
+The key insight: **the subscriber's requested reliability downgrades the connection.** From the MathWorks docs:
+
+> "If a publisher is set to 'reliable', and a subscriber is set to 'besteffort', the publisher treats that connection as
+> only requiring 'besteffort', and does not confirm delivery."
+
+Concretely at the DDS layer:
+
+1. The writer still *can* retransmit (it maintains its history cache because it's a RELIABLE writer).
+2. But the reader, being BEST_EFFORT, **never sends `ACKNACK`** — it doesn't ask for retransmissions.
+3. So in practice, **no retransmissions happen for that reader**. Each sample is effectively delivered once, just like a
+   true best-effort connection.
+4. The writer may still send `HEARTBEAT` submessages (it doesn't know per-reader whether they'll respond), but with no
+   `ACKNACK` coming back, nothing is resent.
+
+**Net effect:** your detector receives each image at most once. If a UDP packet is lost in transit, that image frame is
+simply gone — same behavior as if the publisher were truly best-effort. The "reliable" machinery is in place but idle
+for that reader.
+
+### Practical implication for your bag playback
+
+Since `rosbag2` plays back at a controlled rate (not a high-frequency live sensor), the probability of packet loss on
+localhost is negligible. The RELIABLE→BEST_EFFORT downgrade is effectively a non-issue here — you won't lose frames. You
+don't need the YAML override unless you're playing back over a lossy network or at very high rates where the DDS history
+cache could overflow.
+
+
 
 
 
@@ -330,24 +399,31 @@ Each of these questions are further elaborated on in the Results section.
 
 Execution times vary due to OS scheduling and hardware load, affecting latency and frame drops.
 
-10 runs of the MOT pipeline were performed on sequence 0019 (longest) to measure end-to-end latency variability.
+I investigated this on the PC using the KITTI Tracking sequence 0019, which is the longest sequence in the dataset at
+105.8 seconds. I ran the MOT pipeline 10 times and measured variability of end-to-end latency and frame drops across
+individual runs.
 
 <p align="center">
-  <img src="../results/figures/variance_0019_latency_variability.svg" alt="ReRun Viewer Demo">
-  <figcaption align="left"><em> Each column is a source MCAP frame. Each frame was either processed or dropped on any
+  <img src="../results/figures/variance_0019_latency_variability.svg" alt="Latency and frame drop variability: queue depth 1">
+  <figcaption align="center"><em> Each column is a source MCAP frame. Each frame was either processed or dropped on any
   given run. The more runs processed the frame the higher the column. Color encodes end-to-end latency of the frame.
   Latency samples for given frame are sorted, thus the Y-axis is "sample rank" (i.e. number of runs during which the
   frame was processed). Gray cells mean no latency sample available, therefore a frame drop. </em></figcaption>
 </p>
 
-It's apparent from the figure above that most frames are dropped in the first second of the sequence 0019, which is
-again corroborated by the missing frames histogram below.
+It's apparent from the figure above that most frames are dropped in the first second of the sequence 0019. With
+increasing queue depth of bag player publisher and detector subscriber, fewer frames are dropped initially. I tested
+with depth 10 and 20. With depth 20, every frame is processed by at least one run.
 
-![Missing Samples](../results/figures/variance_0019_missing_samples.svg)
+<p align="center">
+  <img src="../results/figures/variance_0019_q10_latency_variability.svg" alt="Latency and frame drop variability: queue 10">
+  <figcaption align="center"><em> Latency and frame drop variability with queue depth 10. </em></figcaption>
+</p>
 
-- [ ] TODO: Compare with different q-depths to see if drops shift.
-
-
+<p align="center">
+  <img src="../results/figures/variance_0019_q20_latency_variability.svg" alt="Latency and frame drop variability: queue 20">
+  <figcaption align="center"><em> Latency and frame drop variability with queue depth 20. </em></figcaption>
+</p>
 
 ## Executor Threading Effect
 <!-- Fix: rate=1.0, sequences="all", precision=FP32 Switch: *platform* -->

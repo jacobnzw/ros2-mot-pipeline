@@ -51,8 +51,7 @@ TrackerComponent::TrackerComponent(const rclcpp::NodeOptions &options) : Node("t
   sub_opts.callback_group = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   detections_sub_ = create_subscription<msg::TimedDetection2DArray>(
       detections_topic, qos_sub,
-      [this](msg::TimedDetection2DArray::UniquePtr msg) { this->detectionsCallback(std::move(msg)); },
-      sub_opts);
+      [this](msg::TimedDetection2DArray::UniquePtr msg) { this->detectionsCallback(std::move(msg)); }, sub_opts);
 
   const auto tracks_topic = get_parameter("tracks_topic").as_string();
   const auto qos_pub = rclcpp::SensorDataQoS().keep_last(1);

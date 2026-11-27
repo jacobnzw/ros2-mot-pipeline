@@ -52,3 +52,10 @@ __marimo__/
 *.pdf
 *.parquet
 *.excalidraw
+
+
+.github/
+.vscode/
+CMakeFiles/
+data/
+models/

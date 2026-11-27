@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
@@ -156,7 +157,7 @@ vision_msgs::msg::Detection2DArray decode_yolo_output(const InferenceResult &inf
 } // namespace
 
 YoloDetectorComponent::Latencies YoloDetectorComponent::measure_latencies(const rclcpp::Time &callback_start,
-                                                                           const rclcpp::Time &image_stamp) {
+                                                                          const rclcpp::Time &image_stamp) {
   const auto image_stamp_ns = image_stamp.nanoseconds();
   double callback_interval_ms = 0.0;
   double image_stamp_interval_ms = 0.0;
@@ -202,6 +203,7 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
   declare_parameter("confidence_threshold", 0.25);
   declare_parameter("nms_threshold", 0.45);
   declare_parameter("expected_frame_rate", 10.0);
+  declare_parameter("q_depth", 1);
   declare_parameter("log_input_image", false);
   declare_parameter("log_detections", false);
   declare_parameter("recording_path", std::string("runs/recording.rrd"));
@@ -209,8 +211,14 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
   confidence_threshold_ = get_parameter("confidence_threshold").as_double();
   nms_threshold_ = get_parameter("nms_threshold").as_double();
   expected_frame_rate_ = get_parameter("expected_frame_rate").as_double();
+  const auto q_depth_param = get_parameter("q_depth").as_int();
   log_input_image_ = get_parameter("log_input_image").as_bool();
   log_detections_ = get_parameter("log_detections").as_bool();
+
+  if (q_depth_param < 1) {
+    throw std::invalid_argument("q_depth must be greater than zero");
+  }
+  const auto q_depth = static_cast<std::size_t>(q_depth_param);
 
   if (confidence_threshold_ < 0.0 || confidence_threshold_ > 1.0 || nms_threshold_ < 0.0 || nms_threshold_ > 1.0) {
     throw std::invalid_argument("confidence_threshold and nms_threshold must be in [0, 1]");
@@ -239,7 +247,7 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
   // Create subscription for the image_topic and bind callback
   // TODO: Tune QoS
   const auto image_topic = get_parameter("image_topic").as_string();
-  const auto qos_sub = rclcpp::SensorDataQoS().keep_last(1);
+  const auto qos_sub = rclcpp::SensorDataQoS().keep_last(q_depth);
   image_sub_ = create_subscription<sensor_msgs::msg::CompressedImage>(
       image_topic, qos_sub,
       [this](const sensor_msgs::msg::CompressedImage::ConstSharedPtr msg) { this->imageCallback(msg); });
