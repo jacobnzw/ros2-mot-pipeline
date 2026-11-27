@@ -157,7 +157,7 @@ vision_msgs::msg::Detection2DArray decode_yolo_output(const InferenceResult &inf
 } // namespace
 
 YoloDetectorComponent::Latencies YoloDetectorComponent::measure_latencies(const rclcpp::Time &callback_start,
-                                                                           const rclcpp::Time &image_stamp) {
+                                                                          const rclcpp::Time &image_stamp) {
   const auto image_stamp_ns = image_stamp.nanoseconds();
   double callback_interval_ms = 0.0;
   double image_stamp_interval_ms = 0.0;
@@ -247,7 +247,7 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
   // Create subscription for the image_topic and bind callback
   // TODO: Tune QoS
   const auto image_topic = get_parameter("image_topic").as_string();
-  const auto qos_sub = rclcpp::SensorDataQoS().keep_last(1);
+  const auto qos_sub = rclcpp::SensorDataQoS().keep_last(q_depth);
   image_sub_ = create_subscription<sensor_msgs::msg::CompressedImage>(
       image_topic, qos_sub,
       [this](const sensor_msgs::msg::CompressedImage::ConstSharedPtr msg) { this->imageCallback(msg); });
@@ -255,7 +255,7 @@ YoloDetectorComponent::YoloDetectorComponent(const rclcpp::NodeOptions &options)
   // Create publisher for the detection_topic
   // TODO: Tune QoS
   const auto detection_topic = get_parameter("detection_topic").as_string();
-  const auto qos_pub = rclcpp::SensorDataQoS().keep_last(q_depth);
+  const auto qos_pub = rclcpp::SensorDataQoS().keep_last(1);
   detections_pub_ = create_publisher<msg::TimedDetection2DArray>(detection_topic, qos_pub);
 
   RCLCPP_INFO(get_logger(), "YOLO detector component initialized with model '%s'.", model_path.c_str());
