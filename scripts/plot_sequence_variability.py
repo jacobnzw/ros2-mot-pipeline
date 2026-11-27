@@ -114,14 +114,12 @@ def plot_variability(
             alpha=0.25,
             linewidth=0.4,
         )
-    axes[1].hlines(
-        np.arange(1.5, run_count + 0.5), extent[0], detail_end, colors="white", alpha=0.25, linewidth=0.4
-    )
-    figure.suptitle(f"{config}: sequence {sequence} end-to-end latency ({run_count} runs)")
-    figure.supxlabel("Each column is a source frame; samples are sorted by latency. Gray cells = no sample.")
+    axes[1].hlines(np.arange(1.5, run_count + 0.5), extent[0], detail_end, colors="white", alpha=0.25, linewidth=0.4)
+    figure.suptitle(f"Sequence {sequence}: end-to-end latency ({run_count} runs)")
+    # figure.supxlabel("Each column is a source frame; samples are sorted by latency. Gray cells = no sample.")
     figure.colorbar(image, ax=axes, boundaries=edges, ticks=edges, spacing="uniform", label="Latency [ms] (binned)")
     for extension in ("svg", "png"):
-        path = output_dir / f"{config}_{sequence}_latency_variability.{extension}"
+        path = output_dir / f"{config}_latency_variability.{extension}"
         figure.savefig(path, bbox_inches="tight", dpi=200)
         paths.append(path)
     plt.close(figure)
@@ -131,14 +129,14 @@ def plot_variability(
     bins = np.arange(math.floor(end / bin_seconds) + 2) * bin_seconds
     axis.hist(counts["source_seconds"], bins=bins, weights=counts["missing_runs"], edgecolor="black")
     axis.set(
-        title=f"{config}: sequence {sequence} missing end-to-end samples ({run_count} runs)",
+        title=f"Sequence {sequence}: missing end-to-end samples ({run_count} runs)",
         xlabel="Source sequence time [s]",
         ylabel=f"Missing samples per {bin_seconds:g} s",
     )
     axis.yaxis.set_major_locator(MaxNLocator(integer=True))
     figure.tight_layout()
     for extension in ("svg", "png"):
-        path = output_dir / f"{config}_{sequence}_missing_samples.{extension}"
+        path = output_dir / f"{config}_missing_samples.{extension}"
         figure.savefig(path, bbox_inches="tight", dpi=200)
         paths.append(path)
     plt.close(figure)
