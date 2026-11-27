@@ -35,13 +35,14 @@ class RunMetadata:
 class RecordingJob:
     sequence: str
     recording_path: Path
+    extract_tracker_prediction: bool = True
 
 
 @dataclass(frozen=True)
 class SequenceOutput:
     sequence: str
     pipeline_kpi_csv: Path
-    tracker_prediction_file: Path
+    tracker_prediction_file: Path | None
 
 
 def _resolve_metadata_path(value: str, metadata_path: Path) -> Path:
@@ -122,29 +123,27 @@ def recording_job(run_metadata: RunMetadata) -> htypes.Parallelizable[RecordingJ
     if not recordings:
         raise ValueError(f"no recording.rrd files found directly under {run_metadata.config_dir}")
 
-    jobs = []
+    recordings_by_sequence: dict[str, list[Path]] = {}
     for recording_path in recordings:
         parts = recording_path.parent.name.split("_")
         if len(parts) != 2 or not parts[0] or not parts[1]:
             raise ValueError(f"recording directory must follow '<timestamp>_<sequence>': {recording_path.parent}")
-        jobs.append(RecordingJob(sequence=parts[1], recording_path=recording_path))
+        recordings_by_sequence.setdefault(parts[1], []).append(recording_path)
 
-    sequences = [job.sequence for job in jobs]
-    duplicate_sequences = sorted({sequence for sequence in sequences if sequences.count(sequence) > 1})
-    if duplicate_sequences:
-        raise ValueError(f"multiple recordings found for sequence(s): {', '.join(duplicate_sequences)}")
-
-    yield from sorted(jobs, key=lambda job: job.sequence)
+    for sequence, paths in sorted(recordings_by_sequence.items()):
+        for recording_path in paths:
+            yield RecordingJob(sequence, recording_path, extract_tracker_prediction=recording_path == paths[-1])
 
 
 def sequence_output(recording_job: RecordingJob, run_metadata: RunMetadata) -> SequenceOutput:
-    pipeline_output_path = run_metadata.config_dir / "eval" / "pipeline" / f"kpi_{recording_job.sequence}.csv"
+    run_id = recording_job.recording_path.parent.name
+    pipeline_output_path = run_metadata.config_dir / "eval" / "pipeline" / f"kpi_{run_id}.csv"
     pipeline_output_path.parent.mkdir(parents=True, exist_ok=True)
     samples = extract_pipeline_kpi.read_latency_samples(recording_job.recording_path)
     extract_pipeline_kpi.write_csv(
         samples,
         pipeline_output_path,
-        run_id=recording_job.recording_path.parent.name,
+        run_id=run_id,
         hardware=run_metadata.hardware,
         precision=run_metadata.precision,
         n_threads=run_metadata.n_threads,
@@ -153,16 +152,18 @@ def sequence_output(recording_job: RecordingJob, run_metadata: RunMetadata) -> S
         config=run_metadata.config,
     )
 
-    tracker_output_path = (
-        run_metadata.config_dir / "eval" / "trackers" / "bytetrack" / "data" / f"{recording_job.sequence}.txt"
-    )
-    tracker_output_path.parent.mkdir(parents=True, exist_ok=True)
-    tracks = extract_tracker_preds_to_kitti.read_tracks(
-        recording_job.recording_path,
-        fps=10.0,
-        first_frame_timestamp_ns=0,
-    )
-    extract_tracker_preds_to_kitti.write_kitti_tracks(tracks, tracker_output_path)
+    tracker_output_path = None
+    if recording_job.extract_tracker_prediction:
+        tracker_output_path = (
+            run_metadata.config_dir / "eval" / "trackers" / "bytetrack" / "data" / f"{recording_job.sequence}.txt"
+        )
+        tracker_output_path.parent.mkdir(parents=True, exist_ok=True)
+        tracks = extract_tracker_preds_to_kitti.read_tracks(
+            recording_job.recording_path,
+            fps=10.0,
+            first_frame_timestamp_ns=0,
+        )
+        extract_tracker_preds_to_kitti.write_kitti_tracks(tracks, tracker_output_path)
     return SequenceOutput(
         sequence=recording_job.sequence,
         pipeline_kpi_csv=pipeline_output_path,
@@ -180,7 +181,7 @@ def pipeline_kpi_csvs(sequence_outputs: list[SequenceOutput]) -> list[Path]:
 
 
 def tracker_prediction_files(sequence_outputs: list[SequenceOutput]) -> list[Path]:
-    return [output.tracker_prediction_file for output in sequence_outputs]
+    return [output.tracker_prediction_file for output in sequence_outputs if output.tracker_prediction_file is not None]
 
 
 def trackeval_results_folder(tracker_prediction_files: list[Path], run_metadata: RunMetadata) -> Path:

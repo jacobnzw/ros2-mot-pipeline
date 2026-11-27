@@ -176,13 +176,18 @@ class EvaluatePipelineTests(unittest.TestCase):
     def test_hamilton_runs_both_branches_and_evaluates_predictions_once(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            metadata_path = self._create_run(root, ("0019", "0018"))
+            metadata_path = self._create_run(root, ("0019", "0018", "0019"))
             detail_file = root / "trackers" / "bytetrack" / "car_detailed.csv"
             detail_file.parent.mkdir(parents=True)
             detail_file.touch()
             active_readers = 0
             reader_lock = threading.Lock()
             readers_started_together = threading.Event()
+            sample_values = {
+                "20261110T120000Z_0019": 1.0,
+                "20261110T120001Z_0018": 2.0,
+                "20261110T120002Z_0019": 3.0,
+            }
 
             def read_samples(recording_path: Path) -> list[Sample]:
                 nonlocal active_readers
@@ -192,7 +197,9 @@ class EvaluatePipelineTests(unittest.TestCase):
                         readers_started_together.set()
                 if not readers_started_together.wait(timeout=5):
                     raise AssertionError("per-sequence work was not run concurrently")
-                return [Sample(1_000_000_000, "detector_inference_latency_ms", 1.0)]
+                return [
+                    Sample(1_000_000_000, "detector_inference_latency_ms", sample_values[recording_path.parent.name])
+                ]
 
             def read_predictions(recording_path: Path, fps: float, first_frame_timestamp_ns: int) -> list:
                 return []
@@ -203,7 +210,7 @@ class EvaluatePipelineTests(unittest.TestCase):
                     evaluate_pipeline.extract_tracker_preds_to_kitti,
                     "read_tracks",
                     side_effect=read_predictions,
-                ),
+                ) as read_tracks,
                 patch.object(evaluate_pipeline.run_trackeval, "run_trackeval") as run_eval,
                 patch.object(
                     evaluate_pipeline.trackeval_to_vm,
@@ -221,14 +228,28 @@ class EvaluatePipelineTests(unittest.TestCase):
 
             run_eval.assert_called_once()
             self.assertEqual(run_eval.call_args.kwargs["sequences"], ["0018", "0019"])
+            self.assertEqual(read_tracks.call_count, 2)
+            self.assertEqual(
+                {call.args[0].parent.name for call in read_tracks.call_args_list},
+                {"20261110T120001Z_0018", "20261110T120002Z_0019"},
+            )
             self.assertEqual(
                 run_eval.call_args.kwargs["gt_folder"],
                 metadata_path.parent / "eval",
             )
-            self.assertEqual(len(results["pipeline_kpi_csvs"]), 2)
-            self.assertTrue(all(path.is_file() for path in results["pipeline_kpi_csvs"]))
+            pipeline_csvs = results["pipeline_kpi_csvs"]
+            self.assertEqual(len(pipeline_csvs), 3)
+            self.assertEqual(
+                {path.name for path in pipeline_csvs},
+                {"kpi_20261110T120000Z_0019.csv", "kpi_20261110T120001Z_0018.csv", "kpi_20261110T120002Z_0019.csv"},
+            )
+            for path in pipeline_csvs:
+                with path.open(newline="", encoding="utf-8") as csv_file:
+                    row = next(csv.reader(csv_file))
+                    self.assertEqual(row[1], path.stem.removeprefix("kpi_"))
+                    self.assertEqual(float(row[9]), sample_values[row[1]])
             self.assertTrue(results["tracker_kpi_csv"].is_file())
-            with results["pipeline_kpi_csvs"][0].open(newline="", encoding="utf-8") as csv_file:
+            with pipeline_csvs[0].open(newline="", encoding="utf-8") as csv_file:
                 pipeline_row = next(csv.reader(csv_file))
                 self.assertEqual(pipeline_row[5], "2")
                 self.assertEqual(pipeline_row[8], "baseline")

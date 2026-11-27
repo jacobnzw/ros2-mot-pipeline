@@ -36,6 +36,8 @@ class RrdToCsvTests(unittest.TestCase):
 
             with output_path.open(newline="", encoding="utf-8") as csv_file:
                 rows = list(csv.reader(csv_file))
+            self.assertTrue(all(row[10] == "" and row[11] for row in rows))
+            rows = [row[:10] for row in rows]
 
         self.assertCountEqual(
             rows,
@@ -82,6 +84,25 @@ class RrdToCsvTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "no supported time timeline"):
             select_timestamp_column(["log_time"])
 
+    def test_preserves_both_original_timelines(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            recording_path = Path(directory) / "recording.rrd"
+            output_path = Path(directory) / "pipeline.csv"
+            recording = rr.RecordingStream("test-two-timelines")
+            recording.save(recording_path)
+            recording.set_time("steady_elapsed", duration=1.5)
+            recording.set_time("ros2_timestamp", timestamp=0.1)
+            recording.log("pipeline/end_to_end_latency_ms", rr.Scalars(42))
+            recording.disconnect()
+
+            samples = read_latency_samples(recording_path)
+            self.assertEqual(samples, [Sample(1_500_000_000, "pipeline_end_to_end_latency_ms", 42.0,
+                                              100_000_000, 1_500_000_000)])
+            write_csv(samples, output_path, "run", now_ms=1_000_000)
+            with output_path.open(newline="", encoding="utf-8") as csv_file:
+                row = next(csv.reader(csv_file))
+            self.assertEqual(row[10:], ["100000000", "1500000000"])
+
     def test_relative_ros_time_is_anchored_to_export_time(self) -> None:
         self.assertEqual(timestamp_to_unix_ms(100_000_000, 100_000_000, 2_100_000_000, 1_000_000), 998_000)
         self.assertEqual(timestamp_to_unix_ms(2_100_000_000, 100_000_000, 2_100_000_000, 1_000_000), 1_000_000)
@@ -115,6 +136,8 @@ class RrdToCsvTests(unittest.TestCase):
 
             with output_path.open(newline="", encoding="utf-8") as csv_file:
                 rows = list(csv.reader(csv_file))
+            self.assertTrue(all(row[10:] == ["", ""] for row in rows))
+            rows = [row[:10] for row in rows]
 
         self.assertEqual(
             rows,
@@ -161,7 +184,7 @@ class RrdToCsvTests(unittest.TestCase):
 
         self.assertEqual(rows[0][1], "run,one")
         self.assertEqual(rows[0][3], "Jetson, Orin")
-        self.assertEqual(len(rows[0]), 10)
+        self.assertEqual(len(rows[0]), 12)
 
     def test_config_defaults_to_empty_csv_column(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -177,7 +200,7 @@ class RrdToCsvTests(unittest.TestCase):
                 row = next(csv.reader(csv_file))
 
         self.assertEqual(
-            row, ["1000000", "run-001", "detector_inference_latency_ms", "", "", "", "1.0", "", "", "1.0"]
+            row, ["1000000", "run-001", "detector_inference_latency_ms", "", "", "", "1.0", "", "", "1.0", "", ""]
         )
 
 

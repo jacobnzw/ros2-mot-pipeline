@@ -104,6 +104,29 @@ class BuildParquetTests(unittest.TestCase):
         lengths = {r["sequence"]: r["value"] for r in rows if r["source"] == "sequence"}
         self.assertEqual(lengths, {"0000": 154.0, "0001": 447.0})
         self.assertIsNone(next(r for r in rows if r["source"] == "sequence")["timestamp_ms"])
+        self.assertTrue(all(r["ros2_timestamp_ns"] is None and r["steady_elapsed_ns"] is None for r in rows))
+
+    def test_preserves_nanosecond_timelines_from_new_csv(self) -> None:
+        self.write_csv(
+            self.pipeline / "kpi_0000.csv",
+            [
+                [1000, "run_0000", "metric", "rtx3090", "fp32", 2, 1.0, "0000", "example", 1,
+                 1_798_876_800_123_456_789, 1_234_567_890],
+                [2000, "run_0000", "metric", "rtx3090", "fp32", 2, 1.0, "0000", "example", 2, "", ""],
+            ],
+        )
+        build_parquet.build_parquet(self.runs, "*", self.output)
+        rows = pq.read_table(self.output).to_pylist()
+        sample = next(row for row in rows if row["source"] == "pipeline" and row["sequence"] == "0000")
+        self.assertEqual(sample["ros2_timestamp_ns"], 1_798_876_800_123_456_789)
+        self.assertEqual(sample["steady_elapsed_ns"], 1_234_567_890)
+        missing = next(
+            row
+            for row in rows
+            if row["source"] == "pipeline" and row["sequence"] == "0000" and row["timestamp_ms"] == 2000
+        )
+        self.assertIsNone(missing["ros2_timestamp_ns"])
+        self.assertIsNone(missing["steady_elapsed_ns"])
 
     def test_incomplete_inputs_do_not_replace_existing_output(self) -> None:
         self.output.write_bytes(b"existing")
@@ -112,6 +135,47 @@ class BuildParquetTests(unittest.TestCase):
             build_parquet.build_parquet(self.runs, "*", self.output)
         self.assertEqual(self.output.read_bytes(), b"existing")
         self.assertEqual(list(self.root.glob(".results.parquet.*.tmp")), [])
+
+    def test_builds_repeated_runs_and_ignores_superseded_legacy_csv(self) -> None:
+        self.write_csv(
+            self.pipeline / "kpi_0001.csv",
+            [[1000, "20261110T120000Z_0001", "metric", "rtx3090", "fp32", 2, 1.0, "0001", "example", 1]],
+        )
+        for timestamp, value in (("20261110T120000Z", 1), ("20261110T120002Z", 2)):
+            run = f"{timestamp}_0001"
+            self.write_csv(
+                self.pipeline / f"kpi_{run}.csv",
+                [[1000, run, "detector_frame_drop_count", "rtx3090", "fp32", 2, 1.0, "0001", "example", value]],
+            )
+        stderr = io.StringIO()
+        with redirect_stderr(stderr):
+            counts = build_parquet.build_parquet(self.runs, "*", self.output)
+
+        self.assertIn("ignoring duplicate legacy", stderr.getvalue())
+        self.assertEqual(counts["pipeline"], 4)
+        rows = [row for row in pq.read_table(self.output).to_pylist() if row["source"] == "pipeline"]
+        repeats = [row for row in rows if row["sequence"] == "0001"]
+        self.assertEqual({row["run"] for row in repeats}, {"20261110T120000Z_0001", "20261110T120002Z_0001"})
+        self.assertEqual({row["value"] for row in repeats}, {1.0, 2.0})
+
+    def test_preserves_legacy_csv_for_a_distinct_run(self) -> None:
+        self.write_csv(
+            self.pipeline / "kpi_20261110T120000Z_0001.csv",
+            [[1000, "20261110T120000Z_0001", "metric", "rtx3090", "fp32", 2, 1.0, "0001", "example", 1]],
+        )
+        build_parquet.build_parquet(self.runs, "*", self.output)
+        rows = [row for row in pq.read_table(self.output).to_pylist() if row["source"] == "pipeline"]
+        self.assertEqual(
+            {row["run"] for row in rows if row["sequence"] == "0001"}, {"run_0001", "20261110T120000Z_0001"}
+        )
+
+    def test_rejects_per_run_csv_with_mismatched_run_id(self) -> None:
+        self.write_csv(
+            self.pipeline / "kpi_20261110T120000Z_0001.csv",
+            [[1000, "wrong_0001", "metric", "rtx3090", "fp32", 2, 1.0, "0001", "example", 1]],
+        )
+        with self.assertRaisesRegex(ValueError, "run ID does not match"):
+            build_parquet.build_parquet(self.runs, "*", self.output)
 
     def test_detected_gpu_name_is_preserved_across_sources(self) -> None:
         label = "rtx4090"

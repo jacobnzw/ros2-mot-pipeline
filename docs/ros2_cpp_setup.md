@@ -185,7 +185,9 @@ scripts/eval/vm_grafana_ingest.sh baseline
 The evaluation writes per-sequence pipeline KPI CSVs and a tracker KPI CSV under `runs/<config>/eval/`, and the ingest
 script starts the Compose services, waits for them to respond, and imports the CSVs into VictoriaMetrics. Pipeline KPI rows
 have columns
-`timestamp_ms,run,name,hardware,precision,n_threads,rate,sequence,config,value` and become `pipeline_kpi` samples.
+`timestamp_ms,run,name,hardware,precision,n_threads,rate,sequence,config,value,ros2_timestamp_ns,steady_elapsed_ns`
+and become `pipeline_kpi` samples. The final two columns preserve the original Rerun timelines for analysis; the
+VictoriaMetrics import uses the first ten columns.
 `evaluate_pipeline.py` takes the label values and rate from the run metadata; the standalone exporter's `--hw`,
 `--precision`, `--n-threads`, `--seq`, and `--config` options default to empty strings and its rate to `1.0`. TrackEval rows have columns
 `timestamp_ms,hardware,precision,n_threads,rate,config,tracker,sequence,class,metric,value` and become `mot_kpi` samples
@@ -201,7 +203,7 @@ to export the CSV without importing it.
 
 The exporter uses `steady_elapsed` when present, falling back to `ros2_timestamp` for older recordings. It maps elapsed
 time so the final sample is at export time, preserving the spacing between samples and making the recording visible in
-Grafana's current time range.
+Grafana's current time range. Missing original timelines are exported as empty fields.
 
 The Compose stack uses VictoriaMetrics v1.155.0 and Grafana 12.0.0. The VictoriaMetrics image is pulled on first
 startup. Three provisioned dashboards are available: `Overview` shows pooled detector-inference mean/p50/p95 statistics,

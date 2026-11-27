@@ -88,7 +88,7 @@ Key differences include:
 
 *   **Balanced Scoring**: **HOTA** decomposes into **DetA** (Detection Accuracy) and **AssA** (Association Accuracy), 
     combining them via the geometric mean: $$\text{HOTA}_{\alpha} = \sqrt{\text{DetA}_{\alpha} \cdot \text{AssA}_{\alpha}}.$$ This prevents a tracker from achieving a high score by merely detecting objects well while failing to maintain consistent IDs.
-                                          
+                                                                
 *   **Localization**: **HOTA** incorporates localization accuracy directly into its sub-metrics, whereas **MOTA**
     requires a separate metric (**MOTP**) to measure localization, making **HOTA** a more comprehensive single-score
     evaluation.
@@ -268,7 +268,7 @@ I measured and logged the following pipeline KPIs
 
 | KPI | Notes |
 |:----|:------|
-| `pipeline/end_to_end_latency_ms` | Time from image timestamp to publishing the corresponding tracks; measures end-to-end responsiveness. |
+| `pipeline/end_to_end_latency_ms` | Time since the executor ran the detector's `imageCallback` to the end of tracker's `detectionsCallback`; measures end-to-end responsiveness. The time the frame travelled from the MCAP player to the detector node is thus excluded. |
 | `detector/callback_interval_ms`  | Time between consecutive detector callback starts; indicates the effective processing cadence. |
 | `detector/callback_duration_ms`  | Elapsed time for the detector callback, including preprocessing and inference. |
 | `detector/preprocessing_latency_ms`  | Time spent preparing the image input for the model. |
@@ -325,6 +325,28 @@ Each of these questions are further elaborated on in the Results section.
    - Metrics: total frames dropped [count]
 - MOT:
    - Metrics: HOTA, IDF1, MOTP, IDSW, Frag [%] -->
+
+## Execution-Time Variability
+
+Execution times vary due to OS scheduling and hardware load, affecting latency and frame drops.
+
+10 runs of the MOT pipeline were performed on sequence 0019 (longest) to measure end-to-end latency variability.
+
+<p align="center">
+  <img src="../results/figures/variance_0019_latency_variability.svg" alt="ReRun Viewer Demo">
+  <figcaption align="left"><em> Each column is a source MCAP frame. Each frame was either processed or dropped on any
+  given run. The more runs processed the frame the higher the column. Color encodes end-to-end latency of the frame.
+  Latency samples for given frame are sorted, thus the Y-axis is "sample rank" (i.e. number of runs during which the
+  frame was processed). Gray cells mean no latency sample available, therefore a frame drop. </em></figcaption>
+</p>
+
+It's apparent from the figure above that most frames are dropped in the first second of the sequence 0019, which is
+again corroborated by the missing frames histogram below.
+
+![Missing Samples](../results/figures/variance_0019_missing_samples.svg)
+
+- [ ] TODO: Compare with different q-depths to see if drops shift.
+
 
 
 ## Executor Threading Effect
