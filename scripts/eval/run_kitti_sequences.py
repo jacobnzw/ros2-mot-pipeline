@@ -263,7 +263,7 @@ def main() -> int:
         "--q-depth",
         type=positive_int,
         default=1,
-        help="Keep-last queue depth between detector output and tracker input (default: 1)",
+        help="Keep-last queue depth between MCAP player output and detector input (default: 1)",
     )
     parser.add_argument("--precision", required=True, help="Detector model export precision, e.g. fp32 or fp16")
     parser.add_argument("--config", required=True, help="Configuration name used for the runs/<config> directory")
